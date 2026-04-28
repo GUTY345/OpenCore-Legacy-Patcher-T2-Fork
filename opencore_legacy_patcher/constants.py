@@ -13,7 +13,7 @@ from .detections import device_probe
 class Constants:
     def __init__(self) -> None:
         # Patcher Versioning
-        self.patcher_version:                 str = "3.0.1a2"  # OpenCore-Legacy-Patcher
+        self.patcher_version:                 str = "3.1.1pra1"  # OpenCore-Legacy-Patcher
         self.patcher_support_pkg_version:     str = "1.9.6"  # PatcherSupportPkg
         self.copyright_date:                  str = "Copyright © 2020-2025 Dortania"
         self.patcher_name:                    str = "OpenCore Legacy Patcher for T2 Macs"
@@ -28,7 +28,7 @@ class Constants:
 
         # OpenCore Versioning
         # https://github.com/acidanthera/OpenCorePkg
-        self.opencore_version: str = "1.0.5"
+        self.opencore_version: str = "1.0.7"
 
         # Kext Versioning
         ## Acidanthera
