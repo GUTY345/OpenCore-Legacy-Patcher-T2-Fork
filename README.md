@@ -21,6 +21,7 @@ A Python-based project revolving around [Acidanthera's OpenCorePkg](https://gith
 - [ ] Update RestrictEvents to 1.1.6
 - [ ] Update CryptexFixup to 1.0.5
 - [ ] Update FeatureUnlock to 1.1.8
+- [ ] Set DisableIoMapper to True for T2 Macs
 - [X] Remove USB port mapping for MacBookAir8,1 and 8,2 - done
 - [ ] Return support for MacBookAir8,1 and MacBookAir8,2
 
