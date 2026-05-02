@@ -1,4 +1,21 @@
 # OpenCore Legacy Patcher T2 changelog
+## 3.1.1 pre-alpha 1:
+This version begins the upgrade from OpenCore 1.0.5 to 1.0.7 (but hasn't fully upgraded yet). Still it uses mostly 1.0.5.
+
+## 3.1.0 alpha 2.1:
+This release:
+- blacks out Build OpenCore on 2018-2019 MacBook Airs since these models frequently freeze at the Apple logo. This project still uses OpenCore 1.0.5, upgrading to OpenCore 1.0.7 is planned to eventually begin to fix the following issues: https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/18 and https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/8 and eventually, get the MacBookAir8,1 and 8,2 to boot reliably into macOS's installer. Outside this release, in the branch https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/tree/opencore-1-0-7-upgrade I started upgrading to OpenCore 1.0.7, but the code is considered at a pre-alpha stage and is still in very very early development. To test building OpenCore EFI on these models (if you are ready to experiment), you will need to go to the model_array file and remove # from the model that you are going to be testing. 
+- phases out iBridged.kext completely- not needed
+- removes SSDT-T2-SPOOF.dsl as it only spoofed the iBridged version that the T2 chip is running and this is not needed; replaced with [SSDT-T2-SPOOF-SSDT.txt](https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/blob/main/SSDT-T2-SPOOF-SSDT.txt), [T2-Lilu-hooks.txt](https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/blob/main/T2-Lilu-hooks.txt) and [T2-costum-kext-concept.txt](https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/blob/main/T2-costum-kext-concept.txt) - they aren't precompiled and ready to use, rather than there to do research.
+- Remove temporarily Info-Tahoe.plist from AppleUSBMaps (this doesn't affect the OpenCore 1.0.7 upgrade branch), as this is not a full USB port map and as such is incomplete and not even close to ready for testing (this is included in the official OpenCore Legacy Patcher 3.0.0).
+
+The issues https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/8 and https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/18 aren't fixed yet. Both of these require to upgrade OpenCore to version 1.0.7 at very minimum for sure.
+
+Reminder: before to boot into OpenCore on T2 Macs, don't forget to hold command + R until macOS Recovery loads. Then go to Utilities > Terminal. Then, type the following commands:
+csrutil disable
+csrutil-authenticated boot disable
+And then go to Apple Logo > Restart. Then you can boot into OpenCore and boot into macOS's installer.
+
 ## 3.1.0 alpha 2:
 This release:
 - fixes duplicate NVRAM arguments for T2 Macs, which in some cases can cause T2 Macs to stall at the Apple logo or attackers to abuse this via Buffer Overflow vulnerabilities
