@@ -1,4 +1,24 @@
 # OpenCore Legacy Patcher T2 changelog
+## Emergency update for alpha users only: 3.1.0 alpha 3.0:
+This is an emergency update. 
+## Changelog
+Security & Privacy Improvements
+Deprecated Third-Party KDK Endpoints: Completely removed dependency on third-party proxies (OMAPIv1 / OMAPIv2) for Kernel Debug Kit retrieval.
+
+Eliminated Telemetry Tracking: Stopped sending client IP addresses, request intervals, and OS build metadata to external non-Dortania endpoints.
+
+Mitigated Supply Chain & MitM Risks: Enforced direct and secure connections to the official Dortania GitHub repository (KDK_API_LINK_ORIGIN) to prevent Man-in-the-Middle (MitM) attacks caused by unencrypted HTTP fallbacks.
+
+Enhanced Local Integrity Validation: Tightened the validation process for existing KDK installations, reducing reliance on legacy insecure verification scripts.
+
+## Why These Changes Matter
+For users and developers, transitioning from the third-party implementation back to Dortania’s original infrastructure provides significant improvements:
+
+Data Privacy: Your system's IP address, patcher version, and build configuration are no longer logged by intermediate SimpleHac servers.
+
+Supply Chain Security: Downloads are retrieved solely via Dortania's official release mirrors, ensuring the authenticity of the binaries.
+
+
 ## 3.1.1 pre-alpha 3:
 This release:
 - Removes USB port mapping for MacBookAir8,1 and 8,2 - this can eventually cause hangs
