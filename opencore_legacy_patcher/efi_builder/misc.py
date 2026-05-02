@@ -436,9 +436,9 @@ xw
 
         MacBookAir8,1/8,2 support macOS Sequoia with OpenCore Legacy Patcher almost completely out of the box, so their built-in
         T2 kexts (AppleSSE, AppleKeyStore, AppleCredentialManager) must NOT
-        be blocked or replaced.  T1 kexts communicate via USB/SPI and cannot
+        be blocked or replaced. T1 kexts communicate via USB/SPI and cannot
         talk to the T2's PCIe/iBridge SEP; injecting them causes a silent hang
-        at the Apple logo.  The only OCLP-side change needed for T2 Macs is the
+        at the Apple logo. The only OCLP-side change needed for T2 Macs is the
         EFI/BOOT/BOOTx64.efi layout in install.py (handled there).
         """
         if self.model not in ["MacBookAir8,1", "MacBookAir8,2", "Macmini8,1", "iMacPro1,1", "MacBookPro15,2", "MacBookPro15,1", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,3"]:
@@ -446,13 +446,8 @@ xw
 
         # Check for MacBookAir8,1 and 8,2
         if self.model in ["MacBookAir8,1", "MacBookAir8,2"]:
-            # We check the 'target_os' in constants or a custom config if you added one.
-            # Since we can't pop up a UI here without crashing the build thread, 
-            # we will look at the 'os_version' the patcher is currently targeting.
-            
             target_os = self.constants.detected_os  # Default detection
-            
-            # Logic: If targeting Sequoia (macOS 15), disable WEG. Otherwise enable.
+
             if target_os == 15: 
                 logging.info(f"- Model {self.model} on OS {target_os}: Disabling WhateverGreen")
                 support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("WhateverGreen.kext")["Enabled"] = False
@@ -464,10 +459,13 @@ xw
         else:
             # Rest of the models (Standard T2 behavior)
             logging.info("- Enabling WhateverGreen for T2 Mac iGPU rendering")
-            if not support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("WhateverGreen.kext")["Enabled"] is True:
+            
+            if support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("WhateverGreen.kext").get("Enabled") is not True:
                 support.BuildSupport(self.model, self.constants, self.config).enable_kext(
                     "WhateverGreen.kext", self.constants.whatevergreen_version, self.constants.whatevergreen_path
-                )        # Sequoia installer checks hardware compatibility and refuses to proceed
+                )
+
+        # Sequoia installer checks hardware compatibility and refuses to proceed
         # silently (gray screen hang) on unsupported T2 Macs. This bypasses it.
         logging.info("- Adding -no_compat_check for T2 Macs running unsupported macOS versions")
         self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " -no_compat_check"
@@ -484,12 +482,15 @@ xw
         
         sep_patch = support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(
             kernel_patches,
-            "Comment",
-            "Prevent AppleSEPManager SEP timeout panic on T2 Macs (Sequoia)"
+            "Identifier",
+            "com.apple.driver.AppleSEPManager"
         )
+
+        success_flag = False
 
         if sep_patch:
             sep_patch["Enabled"] = True
+            success_flag = True
         else:
             logging.info("- Patch not found in template; injecting manually...")
             new_patch = {
@@ -499,7 +500,7 @@ xw
                 "Count": 0,
                 "Enabled": True,
                 "Find": b"\x48\x83\xBF\xB0\x03\x00\x00\x00\x75\x4F",
-                "Identifier": "com.apple.driver.AppleSEPManagerIntel",
+                "Identifier": "com.apple.driver.AppleSEPManager",
                 "Limit": 0,
                 "Mask": b"",
                 "MaxKernel": "",
@@ -514,9 +515,17 @@ xw
                 self.config["Kernel"]["Patch"] = []
                 
             self.config["Kernel"]["Patch"].append(new_patch)
+            
+            # Verify if the new patch was properly created and stored
+            verification_patch = support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(
+                self.config["Kernel"]["Patch"],
+                "Identifier",
+                "com.apple.driver.AppleSEPManager"
+            )
+            
+            if verification_patch:
+                success_flag = True
 
-        if sep_patch:
-            sep_patch["Enabled"] = True
-        else:
-            logging.warning("We couldn't enable necessary Apple Secure Enclave Processor patches. Aborting...")
+        if not success_flag:
+            logging.error("CRITICAL: Failed to enable or inject necessary Apple Secure Enclave Processor patches. Exiting...")
             sys.exit(3)
