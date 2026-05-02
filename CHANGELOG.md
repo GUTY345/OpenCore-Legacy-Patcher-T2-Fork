@@ -1,4 +1,9 @@
 # OpenCore Legacy Patcher T2 changelog
+## 3.1.1 pre-alpha 3:
+This release:
+- Removes USB port mapping for MacBookAir8,1 and 8,2 - this can eventually cause hangs
+- Fix https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/23
+
 ## 3.1.1 pre-alpha 2.1:
 This release fixes a config.plist bug that doesn't build OpenCore properly on non-T2 Macs. On T2 Macs, this issue remains: https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/23
 
