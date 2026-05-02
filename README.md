@@ -21,7 +21,7 @@ A Python-based project revolving around [Acidanthera's OpenCorePkg](https://gith
 - [ ] Update RestrictEvents to 1.1.6
 - [ ] Update CryptexFixup to 1.0.5
 - [ ] Update FeatureUnlock to 1.1.8
-- [ ] Remove USB port mapping for MacBookAir8,1 and 8,2 - they are unneeded and will cause a hang at the Apple logo on these models - fixed, will be added in the next release
+- [X] Remove USB port mapping for MacBookAir8,1 and 8,2 - done
 - [ ] Return support for MacBookAir8,1 and MacBookAir8,2
 
 Our goal of this project is to add support for T2 Macs so unsupported T2 Macs can boot into Sequoia and Tahoe. This project may run on non-T2 Macs, but support is limited for those and that's not the focus of this project.
