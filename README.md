@@ -16,7 +16,7 @@ A Python-based project revolving around [Acidanthera's OpenCorePkg](https://gith
 - [x] Upgrade config.plist to OpenCore 1.0.7 - done
 - [X] Upgrade WhateverGreen and Lilu to the latest version - done
 - [ ] Upgrade OpenCore-RELEASE.zip to OpenCore 1.0.7
-- [ ] Upgrade OpenCore-DEBUG.zip to OpenCore 1.0.
+- [ ] Upgrade OpenCore-DEBUG.zip to OpenCore 1.0.7
 - [X] Fix https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/23 - done
 - [ ] Update RestrictEvents to 1.1.6
 - [ ] Update CryptexFixup to 1.0.5
