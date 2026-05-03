@@ -103,8 +103,8 @@ class BuildOpenCore:
                 current_args = self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].get("boot-args", "")
                 self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = current_args + t2_args
             
-                # Ensure VT-d is exposed for iBridged
-                self.config["Kernel"]["Quirks"]["DisableIoMapper"] = False
+                # Ensure DisableIoMapper is True
+                self.config["Kernel"]["Quirks"]["DisableIoMapper"] = True
             except Exception as e:
                 logging.error("Whoops, the app failed to inject the required kexts because of the following error:")
                 logging.exception("Stack Trace:") # This prints the full technical error
