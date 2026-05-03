@@ -23,6 +23,7 @@ A Python-based project revolving around [Acidanthera's OpenCorePkg](https://gith
 - [X] Update FeatureUnlock to 1.1.8 - done
 - [X] Set DisableIoMapper to True for T2 Macs - done
 - [X] Remove USB port mapping for MacBookAir8,1 and 8,2 - done
+- [ ] Fix https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/25 
 - [ ] Return support for MacBookAir8,1 and MacBookAir8,2
 
 Our goal of this project is to add support for T2 Macs so unsupported T2 Macs can boot into Sequoia and Tahoe. This project may run on non-T2 Macs, but support is limited for those and that's not the focus of this project.
