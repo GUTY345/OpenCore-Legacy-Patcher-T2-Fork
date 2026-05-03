@@ -9,6 +9,7 @@ A Python-based project revolving around [Acidanthera's OpenCorePkg](https://gith
 ## T2 Mac Support
 
 > **⚠️ Attention, please!** If you download OpenCore Legacy Patcher T2 from Code > Download, you may run into bugs because I'm writing the code mostly directly from GitHub's interface. If you want to avoid running into weird bugs, I recommend to download from Releases instead.
+
 > **⚠️Warnung!** Wenn Sie OpenCore Legacy Patcher T2 über Code > Download herunterladen, in der App kann einige Fehler auftreten, weil ich den Code größtenteils direkt über GitHubs Oberfläche schreibe. Um diese zu vermeiden, es ist empfohlen den OpenCore Legacy Patcher T2-App stattdessen über Releases herunterzuladen.
 > **🚧 Not ready for general use**
 
