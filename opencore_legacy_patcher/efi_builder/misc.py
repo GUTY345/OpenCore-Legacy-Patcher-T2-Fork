@@ -472,7 +472,7 @@ xw
 
         # T2 Support: Enable disk access (AMFI bypass), graphics fixes, and boot delay
         logging.info("- Adding T2-specific boot arguments for macOS 15/26")
-        self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " -v rddelay=5 amfi_get_out_of_my_way=0x1 igfxfw=2 igfxonln=1"
+        self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " -v rddelay=5 amfi=0x80 igfxfw=2 igfxonln=1 revpatch=sbvmm"
 
         # After ~20 SEP mailbox timeouts AppleSEPManagerIntel panics.
         # Patch converts the panic call to an early return.
