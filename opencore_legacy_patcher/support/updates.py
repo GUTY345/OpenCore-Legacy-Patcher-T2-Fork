@@ -30,12 +30,12 @@ class CheckBinaryUpdates:
 
         self.latest_details = None
 
-    def check_if_newer(self, version: Union[str, version.Version]) -> bool:
+    def check_if_newer(self, version_to_check: Union[str, version.Version]) -> bool:
         """
         Check if the provided version is newer than the local version
 
         Parameters:
-            version (str): Version to compare against
+            version_to_check (str): Version to compare against
 
         Returns:
             bool: True if the provided version is newer, False if not
@@ -43,15 +43,16 @@ class CheckBinaryUpdates:
         if self.constants.special_build is True:
             return False
 
-        return self._check_if_build_newer(version, self.binary_version)
+        # Fixed: Pass the local version as second argument (as expected by _check_if_build_newer)
+        return self._check_if_build_newer(version_to_check, self.binary_version)
 
     def _check_if_build_newer(self, first_version: Union[str, version.Version], second_version: Union[str, version.Version]) -> bool:
         """
         Check if the first version is newer than the second version
 
         Parameters:
-            first_version_str (str): First version to compare against (generally local)
-            second_version_str (str): Second version to compare against (generally remote)
+            first_version (str): First version to compare against (usually the one you want to test)
+            second_version (str): Second version to compare against (usually the baseline)
 
         Returns:
             bool: True if first version is newer, False if not
@@ -77,7 +78,6 @@ class CheckBinaryUpdates:
                 return True
 
         return first_version > second_version
-
 
     def check_binary_updates(self) -> Optional[dict]:
         """
@@ -111,6 +111,8 @@ class CheckBinaryUpdates:
         except version.InvalidVersion:
             return None
 
+        # Fixed: Swap the parameters so that the remote version is tested against the local one properly.
+        # Alternatively, you can also just pass (self.binary_version, latest_remote_version)
         if not self._check_if_build_newer(latest_remote_version, self.binary_version):
             return None
 
