@@ -80,40 +80,43 @@ class BuildOpenCore:
         support.BuildSupport(self.model, self.constants, self.config).enable_kext("Lilu.kext", self.constants.lilu_version, self.constants.lilu_path)
         self.config["Kernel"]["Quirks"]["DisableLinkeditJettison"] = True
 
-        # Patches for unsupported T2 Macs
-        # We check if the current model has the T2_CHIP feature flag
+        # 1. Ensure the base NVRAM structure exists globally
+        if "NVRAM" not in self.config:
+            self.config["NVRAM"] = {"Add": {}}
+        if "7C436110-AB2A-4BBB-A880-FE41995C9F82" not in self.config["NVRAM"]["Add"]:
+            self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"] = {"boot-args": ""}
+        
+        # 2. Safely apply -lilubetaall globally to follow Dortania's design
+        current_args_str = self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].get("boot-args", "")
+        current_args_set = set(current_args_str.split())
+        current_args_set.add("-lilubetaall")
+        self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = " ".join(current_args_set)
+        
+        # 3. Apply T2-specific kexts and arguments
         if "T2_CHIP" in self.constants.device_properties.get(self.model, {}).get("Features", []):
             try:
                 logging.info("- Adding T2-specific bypass kexts")
-                # 1. Helper Kexts
+                
                 support.BuildSupport(self.model, self.constants, self.config).enable_kext("CryptexFixup.kext", "1.1.0", self.constants.kext_path)
                 support.BuildSupport(self.model, self.constants, self.config).enable_kext("WhateverGreen.kext", "1.7.0", self.constants.kext_path)
-            
-                # AMFIPass is critical for root patching (GPU drivers) on Tahoe
                 support.BuildSupport(self.model, self.constants, self.config).enable_kext("AMFIPass.kext", "1.4.1", self.constants.kext_path)
+                support.BuildSupport(self.model, self.constants, self.config).enable_kext("RestrictEvents.kext", "1.3.5", self.constants.kext_path)
+                support.BuildSupport(self.model, self.constants, self.config).enable_kext("FeatureUnlock.kext", "1.1.6", self.constants.kext_path)
             
-                # Append T2-specific boot args to the existing boot-args string
-                t2_args = " -ibtcompatbeta -amfipassbeta"
-                if "NVRAM" not in self.config:
-                    self.config["NVRAM"] = {"Add": {}}
-                    if "7C436110-AB2A-4BBB-A880-FE41995C9F82" not in self.config["NVRAM"]["Add"]:
-                        self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"] = {"boot-args": ""}
-
-                # Now safely append
-                current_args = self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].get("boot-args", "")
-                self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = current_args + t2_args
+                # Add T2 specific arguments using the same set union method
+                t2_args = {"-ibtcompatbeta", "-amfipassbeta", "revpatch=sbvmm"}
+                current_args_set = set(self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"].split())
+                
+                final_args_set = current_args_set.union(t2_args)
+                self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = " ".join(final_args_set)
             
-                # Ensure DisableIoMapper is True
                 self.config["Kernel"]["Quirks"]["DisableIoMapper"] = True
+                
             except Exception as e:
                 logging.error("Whoops, the app failed to inject the required kexts because of the following error:")
-                logging.exception("Stack Trace:") # This prints the full technical error
+                logging.exception("Stack Trace:")
                 logging.info("Please try again later.")
                 sys.exit(3)
-
-        # macOS Sequoia support for Lilu plugins
-        self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " -lilubetaall"
-
         # Call support functions
         for function in [
             firmware.BuildFirmware,
