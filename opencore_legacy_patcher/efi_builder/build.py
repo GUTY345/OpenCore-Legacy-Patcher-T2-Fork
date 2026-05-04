@@ -88,12 +88,24 @@ class BuildOpenCore:
         
         # 2. Safely apply -lilubetaall globally to follow Dortania's design
         current_args_str = self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].get("boot-args", "")
-        current_args_set = set(current_args_str.split())
+        current_args_set = set(current_argsstr.split())
         current_args_set.add("-lilubetaall")
         self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = " ".join(current_args_set)
         
-        # 3. Apply T2-specific kexts and arguments
+        # 3. Apply T2-specific kexts and arguments conditionally based on hardware, 
+        # but bypass the restriction that deletes them on target machines.
+        is_t2_mac = False
+        
+        # Method A: Check device features list (best for overall T2 detection)
         if "T2_CHIP" in self.constants.device_properties.get(self.model, {}).get("Features", []):
+            is_t2_mac = True
+        
+        # Method B: Fallback to checking against known T2 model identifiers if features return empty
+        t2_models = ["iMacPro1,1", "iMac19,1", "iMac19,2", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1", "Macmini8,1"]
+        if self.model in t2_models:
+            is_t2_mac = True
+            
+        if is_t2_mac:
             try:
                 logging.info("- Adding T2-specific bypass kexts")
                 
@@ -103,7 +115,6 @@ class BuildOpenCore:
                 support.BuildSupport(self.model, self.constants, self.config).enable_kext("RestrictEvents.kext", "1.3.5", self.constants.kext_path)
                 support.BuildSupport(self.model, self.constants, self.config).enable_kext("FeatureUnlock.kext", "1.1.6", self.constants.kext_path)
             
-                # Add T2 specific arguments using the same set union method
                 t2_args = {"-ibtcompatbeta", "-amfipassbeta", "revpatch=sbvmm"}
                 current_args_set = set(self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"].split())
                 
