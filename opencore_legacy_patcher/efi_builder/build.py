@@ -94,7 +94,6 @@ class BuildOpenCore:
             "MacBookAir8,1",
             "MacBookAir8,2",
             "MacBookAir9,1",
-            "MacBookPro16,2",
             "MacBookPro16,3",
         ]
 
