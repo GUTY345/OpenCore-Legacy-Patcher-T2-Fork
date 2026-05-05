@@ -460,7 +460,6 @@ xw
             logging.info(f"- {self.model}: Applying Unsupported Mantissa Speed kernel panic patches")
             logging.info(f"- {self.model}: Removing USBMap/UTBMap/USBToolBox to avoid unsupported mantissa speed panic")
             support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("USB-Map.kext")["Enabled"] = False
-            support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("USB-Tahoe-Map.kext")["Enabled"] = False
         else:
             # Rest of the models (Standard T2 behavior)
             logging.info("- Enabling WhateverGreen for T2 Mac iGPU rendering")
