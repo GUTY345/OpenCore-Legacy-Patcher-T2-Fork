@@ -431,117 +431,117 @@ xw
                 logging.error(f"UNEXPECTED ERROR in T1 handling: {e}")
                 sys.exit(3)
             
-        def _t2_handling(self) -> None:
-            """
-            T2 Security Chip Handler
-    
-            MacBookAir8,1/8,2 support macOS Sequoia with OpenCore Legacy Patcher almost completely out of the box, so their built-in
-            T2 kexts (AppleSSE, AppleKeyStore, AppleCredentialManager) must NOT
-            be blocked or replaced. T1 kexts communicate via USB/SPI and cannot
-            talk to the T2's PCIe/iBridge SEP; injecting them causes a silent hang
-            at the Apple logo. The only OCLP-side change needed for T2 Macs is the
-            EFI/BOOT/BOOTx64.efi layout in install.py (handled there).
-            """
-            if self.model not in ["MacBookAir8,1", "MacBookAir8,2", "Macmini8,1", "iMacPro1,1", "MacBookPro15,2", "MacBookPro15,1", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,3"]:
-                return
-    
-            # Check for MacBookAir8,1 and 8,2
-            if self.model in ["MacBookAir8,1", "MacBookAir8,2"]:
-                target_os = self.constants.detected_os  # Default detection
-    
-                if target_os == 15: 
-                    logging.info(f"- Model {self.model} on OS {target_os}: Disabling WhateverGreen")
-                    support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("WhateverGreen.kext")["Enabled"] = False
-                else:
-                    logging.info(f"- Model {self.model} on OS {target_os}: Enabling WhateverGreen")
-                    support.BuildSupport(self.model, self.constants, self.config).enable_kext(
-                        "WhateverGreen.kext", self.constants.whatevergreen_version, self.constants.whatevergreen_path
-                    )
-            elif self.model in ["MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1", "MacBookPro16,3"]:
-                logging.info(f"- {self.model}: Applying Unsupported Mantissa Speed kernel panic patches")
-                logging.info(f"- {self.model}: Disable USB-Map.kext or/and USB-Map-Tahoe.kext to avoid unsupported mantissa speed panics")
-                try:
-                    if support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("USB-Map.kext")["Enabled"] == True:
-                        logging.info("We found USB-Map.kext. Disabling...")
-                        support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("USB-Map.kext")["Enabled"] = False
-                    if support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("USB-Map-Tahoe.kext")["Enabled"] == True:
-                        logging.info("We found USB-Map-Tahoe.kext. Disabling...")
-                        support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("USB-Map-Tahoe.kext")["Enabled"] = False
-                    else:
-                        logging.info("We couldn't find USB-Map.kext, nor USB-Map-Tahoe.kext, skipping disable...")
-                except Exception as E:
-                    logging.info("We have some troubles disabling USB-Map.kext and USB-Map-Tahoe.kext. It may be because the file is missing or the synthax is invalid. Skipping...")
+    def _t2_handling(self) -> None:
+        """
+        T2 Security Chip Handler
+
+        MacBookAir8,1/8,2 support macOS Sequoia with OpenCore Legacy Patcher almost completely out of the box, so their built-in
+        T2 kexts (AppleSSE, AppleKeyStore, AppleCredentialManager) must NOT
+        be blocked or replaced. T1 kexts communicate via USB/SPI and cannot
+        talk to the T2's PCIe/iBridge SEP; injecting them causes a silent hang
+        at the Apple logo. The only OCLP-side change needed for T2 Macs is the
+        EFI/BOOT/BOOTx64.efi layout in install.py (handled there).
+        """
+        if self.model not in ["MacBookAir8,1", "MacBookAir8,2", "Macmini8,1", "iMacPro1,1", "MacBookPro15,2", "MacBookPro15,1", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,3"]:
+            return
+
+        # Check for MacBookAir8,1 and 8,2
+        if self.model in ["MacBookAir8,1", "MacBookAir8,2"]:
+            target_os = self.constants.detected_os  # Default detection
+
+            if target_os == 15: 
+                logging.info(f"- Model {self.model} on OS {target_os}: Disabling WhateverGreen")
+                support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("WhateverGreen.kext")["Enabled"] = False
             else:
-                # Rest of the models (Standard T2 behavior)
-                logging.info("- Enabling WhateverGreen for T2 Mac iGPU rendering")
+                logging.info(f"- Model {self.model} on OS {target_os}: Enabling WhateverGreen")
+                support.BuildSupport(self.model, self.constants, self.config).enable_kext(
+                    "WhateverGreen.kext", self.constants.whatevergreen_version, self.constants.whatevergreen_path
+                )
+        elif self.model in ["MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1", "MacBookPro16,3"]:
+            logging.info(f"- {self.model}: Applying Unsupported Mantissa Speed kernel panic patches")
+            logging.info(f"- {self.model}: Disable USB-Map.kext or/and USB-Map-Tahoe.kext to avoid unsupported mantissa speed panics")
+            try:
+                if support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("USB-Map.kext")["Enabled"] == True:
+                    logging.info("We found USB-Map.kext. Disabling...")
+                    support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("USB-Map.kext")["Enabled"] = False
+                if support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("USB-Map-Tahoe.kext")["Enabled"] == True:
+                    logging.info("We found USB-Map-Tahoe.kext. Disabling...")
+                    support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("USB-Map-Tahoe.kext")["Enabled"] = False
+                else:
+                    logging.info("We couldn't find USB-Map.kext, nor USB-Map-Tahoe.kext, skipping disable...")
+            except Exception as E:
+                logging.info("We have some troubles disabling USB-Map.kext and USB-Map-Tahoe.kext. It may be because the file is missing or the synthax is invalid. Skipping...")
+        else:
+            # Rest of the models (Standard T2 behavior)
+            logging.info("- Enabling WhateverGreen for T2 Mac iGPU rendering")
+            
+            if support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("WhateverGreen.kext").get("Enabled") is not True:
+                support.BuildSupport(self.model, self.constants, self.config).enable_kext(
+                    "WhateverGreen.kext", self.constants.whatevergreen_version, self.constants.whatevergreen_path
+                )
+
+        # Sequoia installer checks hardware compatibility and refuses to proceed
+        # silently (gray screen hang) on unsupported T2 Macs. This bypasses it.
+        logging.info("- Adding -no_compat_check for T2 Macs running unsupported macOS versions")
+        self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " -no_compat_check"
+
+        # T2 Support: Enable disk access (AMFI bypass), graphics fixes, and boot delay
+        logging.info("- Adding T2-specific boot arguments for macOS 15/26")
+        self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " -v rddelay=5 amfi=0x80 igfxfw=2 igfxonln=1 revpatch=sbvmm"
+
+        # After ~20 SEP mailbox timeouts AppleSEPManagerIntel panics.
+        # Patch converts the panic call to an early return.
+        logging.info("- Enabling AppleSEPManager SEP timeout panic patch for T2 Macs")
+        
+        kernel_patches = self.config.get("Kernel", {}).get("Patch", [])
+        
+        # We search using the correct identifier key `"Identifier"` and the expected name `"com.apple.driver.AppleSEPManager"`
+        sep_patch = support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(
+            kernel_patches,
+            "Identifier",
+            "com.apple.driver.AppleSEPManager"
+        )
+
+        success_flag = False
+
+        if sep_patch:
+            sep_patch["Enabled"] = True
+            success_flag = True
+        else:
+            logging.info("- Patch not found in template; injecting manually...")
+            new_patch = {
+                "Arch": "x86_64",
+                "Base": "",
+                "Comment": "Prevent AppleSEPManager SEP timeout panic on T2 Macs",
+                "Count": 0,
+                "Enabled": True,
+                "Find": b"\x48\x83\xBF\xB0\x03\x00\x00\x00\x75\x4F",
+                "Identifier": "com.apple.driver.AppleSEPManager",
+                "Limit": 0,
+                "Mask": b"",
+                "MaxKernel": "",
+                "MinKernel": "24.6.0",
+                "Replace": b"\x48\x83\xBF\xB0\x03\x00\x00\x00\xEB\x4F",
+                "ReplaceMask": b"",
+                "Skip": 0
+            }
+            if "Kernel" not in self.config:
+                self.config["Kernel"] = {"Patch": []}
+            if "Patch" not in self.config["Kernel"]:
+                self.config["Kernel"]["Patch"] = []
                 
-                if support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("WhateverGreen.kext").get("Enabled") is not True:
-                    support.BuildSupport(self.model, self.constants, self.config).enable_kext(
-                        "WhateverGreen.kext", self.constants.whatevergreen_version, self.constants.whatevergreen_path
-                    )
-    
-            # Sequoia installer checks hardware compatibility and refuses to proceed
-            # silently (gray screen hang) on unsupported T2 Macs. This bypasses it.
-            logging.info("- Adding -no_compat_check for T2 Macs running unsupported macOS versions")
-            self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " -no_compat_check"
-    
-            # T2 Support: Enable disk access (AMFI bypass), graphics fixes, and boot delay
-            logging.info("- Adding T2-specific boot arguments for macOS 15/26")
-            self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " -v rddelay=5 amfi=0x80 igfxfw=2 igfxonln=1 revpatch=sbvmm"
-    
-            # After ~20 SEP mailbox timeouts AppleSEPManagerIntel panics.
-            # Patch converts the panic call to an early return.
-            logging.info("- Enabling AppleSEPManager SEP timeout panic patch for T2 Macs")
+            self.config["Kernel"]["Patch"].append(new_patch)
             
-            kernel_patches = self.config.get("Kernel", {}).get("Patch", [])
-            
-            # We search using the correct identifier key `"Identifier"` and the expected name `"com.apple.driver.AppleSEPManager"`
-            sep_patch = support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(
-                kernel_patches,
+            # Verify if the new patch was properly created and stored
+            verification_patch = support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(
+                self.config["Kernel"]["Patch"],
                 "Identifier",
                 "com.apple.driver.AppleSEPManager"
             )
-    
-            success_flag = False
-    
-            if sep_patch:
-                sep_patch["Enabled"] = True
+            
+            if verification_patch:
                 success_flag = True
-            else:
-                logging.info("- Patch not found in template; injecting manually...")
-                new_patch = {
-                    "Arch": "x86_64",
-                    "Base": "",
-                    "Comment": "Prevent AppleSEPManager SEP timeout panic on T2 Macs",
-                    "Count": 0,
-                    "Enabled": True,
-                    "Find": b"\x48\x83\xBF\xB0\x03\x00\x00\x00\x75\x4F",
-                    "Identifier": "com.apple.driver.AppleSEPManager",
-                    "Limit": 0,
-                    "Mask": b"",
-                    "MaxKernel": "",
-                    "MinKernel": "24.6.0",
-                    "Replace": b"\x48\x83\xBF\xB0\x03\x00\x00\x00\xEB\x4F",
-                    "ReplaceMask": b"",
-                    "Skip": 0
-                }
-                if "Kernel" not in self.config:
-                    self.config["Kernel"] = {"Patch": []}
-                if "Patch" not in self.config["Kernel"]:
-                    self.config["Kernel"]["Patch"] = []
-                    
-                self.config["Kernel"]["Patch"].append(new_patch)
-                
-                # Verify if the new patch was properly created and stored
-                verification_patch = support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(
-                    self.config["Kernel"]["Patch"],
-                    "Identifier",
-                    "com.apple.driver.AppleSEPManager"
-                )
-                
-                if verification_patch:
-                    success_flag = True
-    
-            if not success_flag:
-                logging.error("CRITICAL: Failed to enable or inject necessary Apple Secure Enclave Processor patches. Exiting...")
-                sys.exit(3)
+
+        if not success_flag:
+            logging.error("CRITICAL: Failed to enable or inject necessary Apple Secure Enclave Processor patches. Exiting...")
+            sys.exit(3)
