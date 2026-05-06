@@ -162,7 +162,20 @@ class BuildOpenCore:
         shutil.copy(self.constants.plist_template, self.constants.oc_folder)
         self.config = plistlib.load(Path(self.constants.plist_path).open("rb"))
     
-    
+    def _save_config(self) -> None:
+        """
+        Save config.plist to disk
+        """
+        try:
+            plistlib.dump(
+                self.config,
+                Path(self.constants.plist_path).open("wb"),
+                sort_keys=True,
+        )
+        except Exception as e:
+            logging.error(f"Function Error while saving config: {e}")
+            sys.exit(3)
+
     def _set_revision(self) -> None:
         """
         Set revision information in config.plist
