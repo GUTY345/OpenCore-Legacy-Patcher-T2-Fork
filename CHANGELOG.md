@@ -1,4 +1,31 @@
 # OpenCore Legacy Patcher T2 changelog
+## 3.1.1 pre-alpha release candidate / 3.1.1 Voralpha Releasekandidat 3:
+This release:
+- Replaces broken ocvalidate and macserial with a functioning one to fix https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/29
+- Continues to roll out patches to fix the T2 controller panic AppleUSBXHCI::createPorts: unsupported speed mantissa 5830 exponent 2 panic when pressing ->
+
+Dieses Version:
+- Ersetzt das kapputen ocvalidate und macserial mit einen, die funktioniert, um den Fehler https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/29 zu verbessern .
+- Weiterfahren, Verbesserungen auszurollen, um das Fehler, indem beim Anklicken der Pfeil -> in Sprache auswählen, der T2-Kontroller mit dem Fehler AppleUSBXHCI::createPorts: unsupported speed mantissa 5830 exponent 2 panic abstürzt
+
+## 3.1.1 pre-alpha release candidate / 3.1.1 Voralpha Releasekandidat 2:
+This release:
+- fixes a bug where RestrictEvents.kext wasn't injected
+- SecureBootModel in the config.plist was set to Default but it was in a weird state because it used the Default model from 1.0.5 instead of the updated one from 1.0.7 
+- Starting to roll out fixes for a bug where MacBook Air 2018, MacBook Air 2019 and MacBook Pro 2020 2 USB 3 ports when booting the installer, as soon as the user presses -> to choose a language, the T2 controller kernel panics with the SHC1@14000000: AppleUSBXHCI::createPorts: unsupported speed mantissa 5830 exponent 2 panic
+Dieses Version: 
+- verbessert einen Fehler, indem RestrictEvents.kext nicht injiziert war
+- Das SecureBootModel war auf Default eingestellt, aber war in kommischen Status, weil es verwendete das Modell von OpenCore 1.0.5 stattdessen von OpenCore 1.0.7
+- Fängt an, Verbesserungen für einen Fehler, sobald der Installationsprogramme auf der MacBook Air 2018, MacBook Air 2019, MacBook Air 2020 2 USB-3 ports, wenn der Benutzer den Pfeil klickt, der T2-Controller stürzt ab mit dem Fehler SHC1@14000000: AppleUSBXHCI::createPorts: unsupported speed mantissa 5830 exponent 2, auszurollen
+
+## 3.1.1 pre-alpha release candidate / 3.1.1 Voralpha Releasekandidat:
+This release:
+
+Fix a vulnerability where updates may not be delivered properly - this vulnerability affects both this repository and Dortania's
+Fix an update suppression vulnerability where an attacker may hide from the users that they aren't running the latest version of the patcher - this vulnerability affects both this repository and Dortania's
+Fix a vulnerability where when trying to update, instead it visits this repository, ending up in a loop that causes CPU cycles
+Another release candidate will be released shortly.
+
 ## 3.1.1 pre-alpha 5:
 This release:
 - upgrades OpenCore-DEBUG.zip to OpenCore 1.0.7
@@ -12,6 +39,11 @@ https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/24
 The following issues remain to be tested whether are fixed or not:
 https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/18 and https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/8
 
+## 3.1.1 pre-alpha 4:
+This release:
+
+Removes USB port mapping for MacBookAir8,1 and 8,2 - this can eventually cause hangs
+Fix #23
 ## 3.1.1 pre-alpha 3:
 ## Security & Privacy Improvements
 Deprecated Third-Party KDK Endpoints: Completely removed dependency on third-party proxies (OMAPIv1 / OMAPIv2) for Kernel Debug Kit retrieval.
