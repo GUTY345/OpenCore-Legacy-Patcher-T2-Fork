@@ -7,7 +7,6 @@ import logging
 import binascii
 import sys
 import os
-import sys
 
 from pathlib import Path
 
@@ -213,7 +212,7 @@ xw
                 support.BuildSupport(self.model, self.constants, self.config).enable_kext("AppleTopCaseInjector.kext", self.constants.topcase_inj_version, self.constants.top_case_inj_path)
 
 
-        #On-device probing
+        # On-device probing
         if not self.constants.custom_model and self.computer.internal_keyboard_type and self.computer.trackpad_type:
 
             support.BuildSupport(self.model, self.constants, self.config).enable_kext("AppleUSBTopCase.kext", self.constants.topcase_version, self.constants.top_case_path)
@@ -228,7 +227,7 @@ xw
             elif self.computer.trackpad_type == "Modern":
                 support.BuildSupport(self.model, self.constants, self.config).enable_kext("AppleUSBMultitouch.kext", self.constants.multitouch_version, self.constants.multitouch_path)
 
-        #Predefined fallback
+        # Predefined fallback
         else:
             # Multi Touch Top Case support for macOS Ventura+
             if smbios_data.smbios_dictionary[self.model]["CPU Generation"] < cpu_data.CPUGen.skylake.value:
