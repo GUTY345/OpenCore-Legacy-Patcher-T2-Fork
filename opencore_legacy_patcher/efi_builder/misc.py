@@ -465,7 +465,7 @@ class BuildMiscellaneous:
                 )
         try:
             logging.info("Enabling CryptexFixup.kext")
-            support.BuildSupport(self.model, self.constants, self.config).enable_kext("CryptexFixup.kext", "1.1.0", self.constants.kext_path)
+            support.BuildSupport(self.model, self.constants, self.config).enable_kext("CryptexFixup.kext", "1.1.0", self.constants.kexts_path)
         except Exception as e:
             logging.error("Injecting CryptexFixup.kext failed because of the following error:")
             logging.exception("Stack Trace:") # This prints the full technical error
