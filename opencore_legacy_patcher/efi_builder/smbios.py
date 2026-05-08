@@ -215,41 +215,49 @@ class BuildSMBIOS:
             plistlib.dump(cpu_config, Path(new_cpu_ls).open("wb"), sort_keys=True)
 
         if self.constants.allow_oc_everywhere is False and self.constants.serial_settings != "None":
-            if self.model == "MacBookPro9,1":
-                new_amc_ls = Path(self.constants.amc_contents_folder) / Path("Info.plist")
-                amc_config = plistlib.load(Path(new_amc_ls).open("rb"))
-                amc_config["IOKitPersonalities"]["AppleMuxControl"]["ConfigMap"][self.spoofed_board] = amc_config["IOKitPersonalities"]["AppleMuxControl"]["ConfigMap"].pop(self.model)
-                for entry in list(amc_config["IOKitPersonalities"]["AppleMuxControl"]["ConfigMap"]):
-                    if not entry.startswith(self.spoofed_board):
-                        amc_config["IOKitPersonalities"]["AppleMuxControl"]["ConfigMap"].pop(entry)
-                plistlib.dump(amc_config, Path(new_amc_ls).open("wb"), sort_keys=True)
-            if self.model not in model_array.NoAGPMSupport:
-                new_agpm_ls = Path(self.constants.agpm_contents_folder) / Path("Info.plist")
-                agpm_config = plistlib.load(Path(new_agpm_ls).open("rb"))
-                agpm_config["IOKitPersonalities"]["AGPM"]["Machines"][self.spoofed_board] = agpm_config["IOKitPersonalities"]["AGPM"]["Machines"].pop(self.model)
-                if self.model == "MacBookPro6,2":
-                    # Force G State to not exceed moderate state
-                    # Ref: https://github.com/fabioiop/MBP-2010-GPU-Panic-fix
-                    logging.info("- Patching G State for MacBookPro6,2")
-                    for gpu in ["Vendor10deDevice0a34", "Vendor10deDevice0a29"]:
-                        agpm_config["IOKitPersonalities"]["AGPM"]["Machines"][self.spoofed_board][gpu]["BoostPState"] = [2, 2, 2, 2]
-                        agpm_config["IOKitPersonalities"]["AGPM"]["Machines"][self.spoofed_board][gpu]["BoostTime"] = [2, 2, 2, 2]
-
-                for entry in list(agpm_config["IOKitPersonalities"]["AGPM"]["Machines"]):
-                    if not entry.startswith(self.spoofed_board):
-                        agpm_config["IOKitPersonalities"]["AGPM"]["Machines"].pop(entry)
-
-                plistlib.dump(agpm_config, Path(new_agpm_ls).open("wb"), sort_keys=True)
-            if self.model in model_array.AGDPSupport:
-                new_agdp_ls = Path(self.constants.agdp_contents_folder) / Path("Info.plist")
-                agdp_config = plistlib.load(Path(new_agdp_ls).open("rb"))
-                agdp_config["IOKitPersonalities"]["AppleGraphicsDevicePolicy"]["ConfigMap"][self.spoofed_board] = agdp_config["IOKitPersonalities"]["AppleGraphicsDevicePolicy"]["ConfigMap"].pop(
-                    self.model
-                )
-                for entry in list(agdp_config["IOKitPersonalities"]["AppleGraphicsDevicePolicy"]["ConfigMap"]):
-                    if not entry.startswith(self.spoofed_board):
-                        agdp_config["IOKitPersonalities"]["AppleGraphicsDevicePolicy"]["ConfigMap"].pop(entry)
-                plistlib.dump(agdp_config, Path(new_agdp_ls).open("wb"), sort_keys=True)
+            try:
+                if self.model == "MacBookPro9,1":
+                    new_amc_ls = Path(self.constants.amc_contents_folder) / Path("Info.plist")
+                    amc_config = plistlib.load(Path(new_amc_ls).open("rb"))
+                    amc_config["IOKitPersonalities"]["AppleMuxControl"]["ConfigMap"][self.spoofed_board] = amc_config["IOKitPersonalities"]["AppleMuxControl"]["ConfigMap"].pop(self.model)
+                    for entry in list(amc_config["IOKitPersonalities"]["AppleMuxControl"]["ConfigMap"]):
+                        if not entry.startswith(self.spoofed_board):
+                            amc_config["IOKitPersonalities"]["AppleMuxControl"]["ConfigMap"].pop(entry)
+                    plistlib.dump(amc_config, Path(new_amc_ls).open("wb"), sort_keys=True)
+                if self.model not in model_array.NoAGPMSupport:
+                    new_agpm_ls = Path(self.constants.agpm_contents_folder) / Path("Info.plist")
+                    agpm_config = plistlib.load(Path(new_agpm_ls).open("rb"))
+                    if self.model in agpm_config["IOKitPersonalities"]["AGPM"]["Machines"]:
+                        agpm_config["IOKitPersonalities"]["AGPM"]["Machines"][self.spoofed_board] = agpm_config["IOKitPersonalities"]["AGPM"]["Machines"].pop(self.model)
+                    agpm_config["IOKitPersonalities"]["AGPM"]["Machines"][self.spoofed_board] = agpm_config["IOKitPersonalities"]["AGPM"]["Machines"].pop(self.model)
+                    if self.model == "MacBookPro6,2":
+                        # Force G State to not exceed moderate state
+                        # Ref: https://github.com/fabioiop/MBP-2010-GPU-Panic-fix
+                        logging.info("- Patching G State for MacBookPro6,2")
+                        for gpu in ["Vendor10deDevice0a34", "Vendor10deDevice0a29"]:
+                            agpm_config["IOKitPersonalities"]["AGPM"]["Machines"][self.spoofed_board][gpu]["BoostPState"] = [2, 2, 2, 2]
+                            agpm_config["IOKitPersonalities"]["AGPM"]["Machines"][self.spoofed_board][gpu]["BoostTime"] = [2, 2, 2, 2]
+    
+                    for entry in list(agpm_config["IOKitPersonalities"]["AGPM"]["Machines"]):
+                        if not entry.startswith(self.spoofed_board):
+                            agpm_config["IOKitPersonalities"]["AGPM"]["Machines"].pop(entry)
+    
+                    plistlib.dump(agpm_config, Path(new_agpm_ls).open("wb"), sort_keys=True)
+                if self.model in model_array.AGDPSupport:
+                    new_agdp_ls = Path(self.constants.agdp_contents_folder) / Path("Info.plist")
+                    agdp_config = plistlib.load(Path(new_agdp_ls).open("rb"))
+                    agdp_config["IOKitPersonalities"]["AppleGraphicsDevicePolicy"]["ConfigMap"][self.spoofed_board] = agdp_config["IOKitPersonalities"]["AppleGraphicsDevicePolicy"]["ConfigMap"].pop(
+                        self.model
+                    )
+                    for entry in list(agdp_config["IOKitPersonalities"]["AppleGraphicsDevicePolicy"]["ConfigMap"]):
+                        if not entry.startswith(self.spoofed_board):
+                            agdp_config["IOKitPersonalities"]["AppleGraphicsDevicePolicy"]["ConfigMap"].pop(entry)
+                    plistlib.dump(agdp_config, Path(new_agdp_ls).open("wb"), sort_keys=True)
+            except Exception as e:
+                logging.error("Adjusting necessary patches failed because of the following error:")
+                logging.exception("Stack Trace:") # This prints the full technical error
+                logging.info("Please try again later.")
+                sys.exit(3)
 
 
     def _minimal_serial_patch(self) -> None:
