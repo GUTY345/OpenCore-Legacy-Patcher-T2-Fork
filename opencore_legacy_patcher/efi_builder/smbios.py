@@ -62,14 +62,22 @@ class BuildSMBIOS:
                     support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(self.config["Kernel"]["Patch"], "Identifier", "com.apple.driver.AppleSMC")["Enabled"] = True
                     support.BuildSupport(self.model, self.constants, self.config).enable_kexts("SMC-Spoof.kext", self.constants.smcspoof_version, self.constants.smcspoof_path)
                 except Exception as E:
-                    logging.info("AppleSMC couldn't be injected due to some issues. Aborting...")
+                    logging.error("Whoops, injecting SMC-Spoof.kext failed because of the following error:")
+                    logging.exception("Stack Trace:") # This prints the full technical error
+                    logging.info("Please try again later.")
                     sys.exit(3)
 
         if self.constants.serial_settings in ["Moderate", "Advanced"]:
-            logging.info("- Enabling USB Rename Patches")
-            support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(self.config["ACPI"]["Patch"], "Comment", "XHC1 to SHC1")["Enabled"] = True
-            support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(self.config["ACPI"]["Patch"], "Comment", "EHC1 to EH01")["Enabled"] = True
-            support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(self.config["ACPI"]["Patch"], "Comment", "EHC2 to EH02")["Enabled"] = True
+            try:
+                logging.info("- Enabling USB Rename Patches")
+                support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(self.config["ACPI"]["Patch"], "Comment", "XHC1 to SHC1")["Enabled"] = True
+                support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(self.config["ACPI"]["Patch"], "Comment", "EHC1 to EH01")["Enabled"] = True
+                support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(self.config["ACPI"]["Patch"], "Comment", "EHC2 to EH02")["Enabled"] = True
+            except Exception as e:
+                logging.error("Whoops, enabling USB Rename patches failed because of the following error:")
+                logging.exception("Stack Trace:") # This prints the full technical error
+                logging.info("Please try again later.")
+                sys.exit(3)
 
         if self.model == self.constants.override_smbios:
             logging.info("- Adding -no_compat_check")
