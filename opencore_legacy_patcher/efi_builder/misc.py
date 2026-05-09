@@ -434,7 +434,7 @@ class BuildMiscellaneous:
         T2 Security Chip Handler
         T2 Macs shouldn't be patched with T1 patches because on T2 Macs, the T2 controlls the USB controller, while on T1 Macs, that's not the case.
         """
-        if self.model not in ["MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1" "Macmini8,1", "iMacPro1,1", "MacBookPro15,2", "MacBookPro15,1", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,3"]:
+        if self.model not in ["MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1", "Macmini8,1", "iMacPro1,1", "MacBookPro15,2", "MacBookPro15,1", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,3"]:
             return
 
         # Check for MacBookAir8,1 and 8,2
