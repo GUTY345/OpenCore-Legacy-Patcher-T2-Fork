@@ -10,6 +10,7 @@ ie. during automated patching
 import logging
 import plistlib
 import os
+import subprocess
 from pathlib import Path
 
 
@@ -31,7 +32,6 @@ class GlobalEnviromentSettings:
         """
         Reads a property from the global settings file
         """
-        # Security: Do not follow symbolic links
         if Path(self.global_settings_plist).is_symlink():
             logging.warning("Security Alert: Symlink detected during read. Ignoring.")
             return None
@@ -59,8 +59,8 @@ class GlobalEnviromentSettings:
         Deletes a property from the global settings file
         """
         if Path(self.global_settings_plist).exists():
-            # Security: Verify ownership before modification
             try:
+                # Security: Verify ownership
                 file_info = os.stat(self.global_settings_plist)
                 if file_info.st_uid not in [0, os.getuid()]:
                     logging.error("Security Error: Settings file is owned by an untrusted user.")
@@ -70,7 +70,6 @@ class GlobalEnviromentSettings:
                 if property_name in plist:
                     del plist[property_name]
                     plistlib.dump(plist, Path(self.global_settings_plist).open("wb"))
-                    # Ensure permissions remain secure
                     os.chmod(self.global_settings_plist, 0o600)
             except Exception as e:
                 logging.error("Error: Unable to modify global settings file")
@@ -79,16 +78,16 @@ class GlobalEnviromentSettings:
 
     def write_property(self, property_name: str, property_value) -> None:
         """
-        Writes a property to the global settings file
+        Writes a property to the global environment settings
         """
-        # Security: Destroy symlinks to prevent arbitrary file writes
+        # Security: Destroy symlinks
         if Path(self.global_settings_plist).is_symlink():
-            logging.warning("Security Alert: Symlink detected. Unlinking for safety.")
+            logging.warning("Security Alert: Symlink detected. Unlinking.")
             Path(self.global_settings_plist).unlink()
 
         if Path(self.global_settings_plist).exists():
             try:
-                # Security: Verify ownership before writing
+                # Security: Verify ownership
                 file_info = os.stat(self.global_settings_plist)
                 if file_info.st_uid not in [0, os.getuid()]:
                     logging.error("Security Error: Settings file is owned by an untrusted user.")
@@ -98,7 +97,6 @@ class GlobalEnviromentSettings:
                 plist[property_name] = property_value
                 
                 plistlib.dump(plist, Path(self.global_settings_plist).open("wb"))
-                # Security: Set permissions to owner-only (Read/Write)
                 os.chmod(self.global_settings_plist, 0o600)
             except Exception as e:
                 logging.error("Failed to write to global settings file")
@@ -107,23 +105,36 @@ class GlobalEnviromentSettings:
 
     def _generate_settings_file(self) -> None:
         """
-        Initializes the settings file if it doesn't exist
+        Initializes the settings file and handles ownership conflicts
         """
-        if Path(self.global_settings_plist).is_symlink():
-            Path(self.global_settings_plist).unlink()
+        path = Path(self.global_settings_plist)
 
-        if Path(self.global_settings_plist).exists():
-            return
+        # 1. Clear Symlinks
+        if path.is_symlink():
+            path.unlink()
 
-        try:
-            # Ensure the parent directory exists
-            Path(self.global_settings_folder).mkdir(parents=True, exist_ok=True)
-            
-            plistlib.dump({"Developed by Dortania": True}, Path(self.global_settings_plist).open("wb"))
-            # Security: Restrict access immediately upon creation
-            os.chmod(self.global_settings_plist, 0o600)
-        except (PermissionError, OSError) as e:
-            logging.info(f"Unable to initialize global settings file: {e}")
+        # 2. Ownership Conflict Resolution (Self-Healing)
+        if path.exists():
+            file_info = os.stat(self.global_settings_plist)
+            if file_info.st_uid not in [0, os.getuid()]:
+                logging.warning("Untrusted settings file detected. Attempting to remove...")
+                try:
+                    # Attempt to remove the file if we have directory write access
+                    path.unlink()
+                except PermissionError:
+                    # If we fail, tell the user to use sudo
+                    logging.error("CRITICAL: Cannot remove untrusted file. Please run:")
+                    logging.error(f"sudo rm {self.global_settings_plist}")
+                    return
+
+        # 3. Create fresh file if missing
+        if not path.exists():
+            try:
+                Path(self.global_settings_folder).mkdir(parents=True, exist_ok=True)
+                plistlib.dump({"Developed by Dortania": True}, path.open("wb"))
+                os.chmod(self.global_settings_plist, 0o600)
+            except (PermissionError, OSError) as e:
+                logging.info(f"Unable to initialize global settings file: {e}")
 
 
     def _convert_defaults_to_global_settings(self) -> None:
@@ -136,7 +147,6 @@ class GlobalEnviromentSettings:
             try:
                 defaults_plist = plistlib.load(defaults_path.open("rb"))
                 
-                # Check if global file exists to merge, else start fresh
                 if Path(self.global_settings_plist).exists():
                     global_settings_plist = plistlib.load(Path(self.global_settings_plist).open("rb"))
                 else:
@@ -147,7 +157,6 @@ class GlobalEnviromentSettings:
                 plistlib.dump(global_settings_plist, Path(self.global_settings_plist).open("wb"))
                 os.chmod(self.global_settings_plist, 0o600)
                 
-                # Remove the legacy file after successful migration
                 defaults_path.unlink()
             except Exception as e:
                 logging.error("Error during settings migration")
