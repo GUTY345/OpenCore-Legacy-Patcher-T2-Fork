@@ -489,7 +489,7 @@ class BuildMiscellaneous:
             except Exception as E:
                 logging.info("We have some troubles disabling USB-Map.kext and USB-Map-Tahoe.kext. It may be because the file is missing or the synthax is invalid. Skipping...")
             try:
-               logging.info("- Skipping Language and Region selection")
+                logging.info("- Skipping Language and Region selection")
                 # Sets the language to English (Universal) and avoids the initial picker
                 self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["prev-lang:kbd"] = "en-US:0"
             except Exception as e:
