@@ -1,4 +1,43 @@
 # OpenCore Legacy Patcher T2 changelog / OpenCore Legacy Patcher T2-Änderungslog
+4.0.0 alpha 5 - the emergency update / der Notfallsupdate 🚨 :
+This release:
+- Fixes a bug where settings couldn't be saved 
+- and the following vulnerabilities:
+1. Arbitrary File Overwrite (via Symlink Attack)
+The Vulnerability: An attacker could replace your settings file with a symbolic link (symlink) pointing to a critical system file (e.g., /etc/sudoers or /etc/passwd). When the script tried to save settings, it would follow that link and overwrite the system file with its own data, potentially breaking the OS or creating a back door.
+
+The Fix: By adding if Path(...).is_symlink(): Path(...).unlink(), the script now detects if the file is a "shortcut" to somewhere else. If it is, the script destroys the link and creates a brand-new, real file instead, ensuring it never touches a file it didn't intend to.
+
+2. Privilege Escalation
+The Vulnerability: Because the script uses /Users/Shared, a location accessible to all users on a Mac, a standard (non-admin) user could "plant" a settings file. When an Admin runs the Patcher, the tool would read the standard user's "poisoned" settings (like a custom script path or a dangerous boot flag) and execute them with Admin or Root privileges.
+
+The Fix: The updated logic (especially when combined with checking os.stat().st_uid) ensures the script only trusts files owned by the current user or root. By unlinking existing files that don't pass the check, you prevent a low-privileged user from influencing a high-privileged process.
+
+3. Information Disclosure
+The Vulnerability: Without explicit permission management, the settings file might be created with "world-readable" permissions. This could allow any user or malicious app on the system to read your configuration, including hardware serial numbers, board IDs, and other sensitive system identifiers used by OpenCore.
+
+The Fix: By adding os.chmod(..., 0o600), you ensure that only the owner of the file (you or the system) can read or write it. This "locks the door," making the file invisible and inaccessible to other users or third-party apps on the machine.
+
+Diese Version:
+
+- Behebt einen Fehler, der das Speichern von Einstellungen verhinderte
+
+- und die folgenden Sicherheitslücken:
+1. Beliebiges Überschreiben von Dateien (über Symlink-Angriff)
+Die Sicherheitslücke: Ein Angreifer konnte Ihre Einstellungsdatei durch einen symbolischen Link (Symlink) ersetzen, der auf eine kritische Systemdatei (z. B. /etc/sudoers oder /etc/passwd) verweist. Beim Versuch, die Einstellungen zu speichern, folgte das Skript diesem Link und überschrieb die Systemdatei mit eigenen Daten. Dies kann das Betriebssystem beschädigen oder eine Hintertür öffnen.
+
+Die Lösung: Durch Hinzufügen von `if Path(...).is_symlink(): Path(...).unlink()` erkennt das Skript nun, ob es sich bei der Datei um eine Verknüpfung zu einem anderen Verzeichnis handelt. In diesem Fall zerstört das Skript den Link und erstellt stattdessen eine neue, echte Datei. So wird sichergestellt, dass niemals eine Datei verändert wird, die nicht beabsichtigt war.
+
+2. Rechteausweitung
+Die Schwachstelle: Da das Skript den Ordner /Users/Shared verwendet, auf den alle Benutzer eines Macs Zugriff haben, könnte ein normaler Benutzer (ohne Administratorrechte) eine Einstellungsdatei dort platzieren. Wenn ein Administrator den Patcher ausführt, liest das Tool die manipulierten Einstellungen des normalen Benutzers (z. B. einen benutzerdefinierten Skriptpfad oder ein gefährliches Boot-Flag) und führt sie mit Administrator- oder Root-Rechten aus.
+
+Die Lösung: Die aktualisierte Logik (insbesondere in Kombination mit der Überprüfung von os.stat().st_uid) stellt sicher, dass das Skript nur Dateien vertraut, die dem aktuellen Benutzer oder Root gehören. Durch das Entfernen vorhandener Dateien, die die Überprüfung nicht bestehen, wird verhindert, dass ein Benutzer mit geringen Rechten einen Prozess mit hohen Rechten beeinflusst.
+
+3. Offenlegung von Informationen
+Die Schwachstelle: Ohne explizite Berechtigungsverwaltung kann die Einstellungsdatei mit für alle Benutzer lesbaren Berechtigungen erstellt werden. Dies könnte es jedem Benutzer oder jeder bösartigen Anwendung auf dem System ermöglichen, Ihre Konfiguration zu lesen, einschließlich Hardware-Seriennummern, Board-IDs und anderer sensibler Systemkennungen, die von OpenCore verwendet werden.
+
+Die Lösung: Durch Hinzufügen von `os.chmod(..., 0o600)` stellen Sie sicher, dass nur der Eigentümer der Datei (Sie oder das System) diese lesen und schreiben kann. Dadurch wird die Datei quasi „abgesperrt“ und ist für andere Benutzer oder Drittanbieter-Apps auf dem System unsichtbar und unzugänglich.
+
 ## 4.0.0 alpha 4:
 Thanks @kodeaqua for contributing to this project for the research of MacBook Air 2018 and 2019! This helps us identify the issues it faces to boot into macOS Recovery that other people are facing. I myself only have Mac mini 2018 and MacBook Pro 2020 4 thunderbolt 3 ports and they work completely differently from these 2 MacBook Airs.
 This version:
