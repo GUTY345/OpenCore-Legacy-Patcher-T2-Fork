@@ -48,16 +48,16 @@ class BuildSMBIOS:
         """
 
         if self.constants.allow_oc_everywhere is False or self.constants.allow_native_spoofs is True:
-            if self.constants.serial_settings == "None":
-                try:
-                    # Credit to Parrotgeek1 for boot.efi and hv_vmm_present patch sets
-                    logging.info("Enabling Board ID exemption patches.")
-                    support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(self.config["Booter"]["Patch"], "Comment", "Skip Board ID check")["Enabled"] = True
-                except Exception as e:
-                    logging.error("Unfortunately, we are facing issues injecting Board ID exemption patches due to the following error:")
-                    logging.exception("Stack Trace:") # This prints the full technical error
-                    logging.info("Please try again later.")
-                    sys.exit(3)
+                if self.constants.serial_settings == "None":
+                    try:
+                        # Credit to Parrotgeek1 for boot.efi and hv_vmm_present patch sets
+                        logging.info("Enabling Board ID exemption patches.")
+                        support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(self.config["Booter"]["Patch"], "Comment", "Skip Board ID check")["Enabled"] = True
+                    except Exception as e:
+                        logging.error("Unfortunately, we are facing issues injecting Board ID exemption patches due to the following error:")
+                        logging.exception("Stack Trace:") # This prints the full technical error
+                        logging.info("Please try again later.")
+                        sys.exit(3)
 
         else:
             try:
