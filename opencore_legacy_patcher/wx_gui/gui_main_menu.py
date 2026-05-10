@@ -409,20 +409,21 @@ Please check the Github page for more information about this release."""
         url = event.GetURL()
         webbrowser.open(url)
     
-    def on_gemini_help(self, event: wx.Event = None):
-        """
-        Launch a native wxPython WebView window for Gemini
-        """
-        gemini_frame = wx.Frame(None, title="OCLP AI Assistant (Gemini)", size=(450, 800))
-        panel = wx.Panel(gemini_frame)
-        sizer = wx.BoxSizer(wx.VERTICAL)
+    def on_gemini_help(self, event: wx.Event):
+        import webview # Import here to avoid slowing down OCLP startup
         
-        # Create the WebView inside the frame
-        browser = wx.html2.WebView.New(panel)
-        browser.LoadURL("https://gemini.google.com")
+        logging.info("- Launching Gemini AI Assistant (pywebview)")
         
-        sizer.Add(browser, 1, wx.EXPAND)
-        panel.SetSizer(sizer)
+        # Create a sleek, floating window
+        window = webview.create_window(
+            title='Gemini AI Assistant',
+            url='https://gemini.google.com',
+            width=500,
+            height=850,
+            confirm_close=False,
+            background_color='#ffffff'
+        )
         
-        gemini_frame.Centre()
-        gemini_frame.Show()
+        # start() is blocking by default, but in a wxPython app, 
+        # it usually needs to run in its own flow.
+        webview.start()
