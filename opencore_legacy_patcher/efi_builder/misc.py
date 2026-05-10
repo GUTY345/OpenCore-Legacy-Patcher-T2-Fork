@@ -510,6 +510,11 @@ class BuildMiscellaneous:
         self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " vmmroot=1"
         logging.info("-Set NVRAM variable to -disable_ext_panics")
         self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " -disable_ext_panics"
+        # This is the 'Magic' that makes grep VMM return something
+        logging.info("-Add Cpuid1Data and Cpuid1Mask NVRAM variables")
+        self.config["Kernel"]["Emulate"]["Cpuid1Data"] = binascii.unhexlify("00000000000000000000000000000080")
+        self.config["Kernel"]["Emulate"]["Cpuid1Mask"] = binascii.unhexlify("00000000000000000000000000000080")
+
         # After ~20 SEP mailbox timeouts AppleSEPManagerIntel panics.
         # Patch converts the panic call to an early return.
         logging.info("- Enabling AppleSEPManager SEP timeout panic patch for T2 Macs")
