@@ -1,4 +1,15 @@
 # OpenCore Legacy Patcher T2 changelog / OpenCore Legacy Patcher T2-Änderungslog
+## 4.0.0 alpha 7:
+This release:
+- Fixes a bug where when the EFI is ready, the popup crashes
+- The Ask Gemini button overlapped
+
+Diese Version:
+
+- Behebt einen Fehler, der zum Absturz des Popups führte, sobald die EFI bereit war.
+
+- Behebt einen Fehler, der dazu führte, dass die Schaltfläche „Gemini fragen“ überlappte.
+
 ## 4.0.0 alpha 6:
 This release:
 - Adds Ask Gemini button
