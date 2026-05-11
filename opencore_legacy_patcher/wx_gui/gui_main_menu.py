@@ -144,7 +144,7 @@ class MainFrame(wx.Frame):
             },
         }
         button_x = 30
-        button_y = model_label.GetPosition()[1] + 30
+        button_y = model_label.GetPosition()[1] + 40
         rollover = len(menu_buttons) / 2
         if rollover % 1 != 0:
             rollover = int(rollover) + 1
