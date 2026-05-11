@@ -440,6 +440,7 @@ class BuildMiscellaneous:
         if self.model not in ["MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1", "Macmini8,1", "iMacPro1,1", "MacBookPro15,2", "MacBookPro15,1", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,3"]:
             return
 
+        builder = support.BuildSupport(self.model, self.constants, self.config)
         logging.info("- Enabling WhateverGreen")
         
         if support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("WhateverGreen.kext").get("Enabled") is not True:
@@ -479,7 +480,9 @@ class BuildMiscellaneous:
                     logging.info("No USB-Map.kext or USB-Tahoe.kext is found. Continuing onto the next step...")
                 try:
                     logging.info("Injecting Disable AppleUSBHostPort power state timeout patches...")
-                    {
+                    # Define and append the HostPort Patch
+                    logging.info("  - Injecting AppleUSBHostPort power state timeout patch")
+                    usb_host_patch = {
                         "Arch": "x86_64",
                         "Comment": "Disable AppleUSBHostPort power state timeout",
                         "Enabled": True,
@@ -488,15 +491,16 @@ class BuildMiscellaneous:
                         "Replace": b"\xEB\x0C\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90",
                         "MinKernel": "24.0.0"
                     }
-                    self.config["Kernel"]["Patch"].append(new_patch)
+            self.config["Kernel"]["Patch"].append(usb_host_patch)
                 except Exception as e:
                     logging.error("We have some troubles injecting AppleUSBHostPort power state timeout patches. The error is the following:")
                     logging.exception("Stack Trace:") # This prints the full technical error
                     logging.info("Aborting...")
                     sys.exit(3)
                 try:
-                    logging.info("Patch AppleUSBVHCI to skip transition timeout...")
-                    {
+                    # Define and append the VHCI Patch
+                    logging.info("  - Injecting AppleUSBVHCI transition timeout patch")
+                    vhci_patch = {
                         "Arch": "x86_64",
                         "Comment": "Patch AppleUSBVHCI to skip transition timeout",
                         "Enabled": True,
@@ -505,9 +509,9 @@ class BuildMiscellaneous:
                         "Replace": b"\x48\x8B\x05\x00\x00\x00\x00\x48\x8D\x0D\x00\x00\x00\x00\x41\xBB\x00\x00\x00\x00",
                         "MinKernel": "24.0.0"
                     }
-                    self.config["Kernel"]["Patch"].append(new_patch)
+                    self.config["Kernel"]["Patch"].append(vhci_patch)
                 except Exception as E:
-                    logging.error("We have some troubles injecting AppleUSBVHCI skip transition timeout patches. The error is the following:")
+                    logging.error("We have some troubles injecting AppleUSBVHCI transition timeout patches. The error is the following:")
                     logging.exception("Stack Trace:") # This prints the full technical error
                     logging.info("Aborting...")
                     sys.exit(3)
