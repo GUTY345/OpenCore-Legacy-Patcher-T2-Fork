@@ -11,7 +11,6 @@ from .. import constants
 
 from ..datasets import os_data
 from ..support import install
-from ..support import device_probe
 
 from ..wx_gui import (
     gui_main_menu,
