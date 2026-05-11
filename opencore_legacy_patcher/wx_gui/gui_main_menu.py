@@ -36,7 +36,7 @@ from ..wx_gui import (
 class MainFrame(wx.Frame):
     def __init__(self, parent: wx.Frame, title: str, global_constants: constants.Constants, screen_location: tuple = None):
         logging.info("Initializing Main Menu Frame")
-        super(MainFrame, self).__init__(parent, title=title, size=(800, 600), style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX))
+        super(MainFrame, self).__init__(parent, title=title, size=(700, 500), style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX))
         gui_support.GenerateMenubar(self, global_constants).generate()
 
         self.constants: constants.Constants = global_constants
