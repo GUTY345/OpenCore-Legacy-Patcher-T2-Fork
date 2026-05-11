@@ -303,6 +303,11 @@ class InstallOCFrame(wx.Frame):
                 return
 
             elif not self.constants.custom_model:
+                # The URL to the instructions repository
+                url = "https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2-Instructions-for-T2-Macs/tree/main"
+                
+                # This command opens the link in your default browser (Safari, Chrome, etc.)
+                webbrowser.open(url)
                 gui_support.RestartHost(self).restart(message="OpenCore has finished installing to disk.\n\nYou will need to reboot and hold the Option key and select OpenCore/Boot EFI's option.\n\nWould you like to reboot?\n\nIn some cases, instead of OpenCore it is labeled as Windows on T2 Macs if you\n\nare running Boot Camp on your Mac.")
             else:
                 popup_message = wx.MessageDialog(
