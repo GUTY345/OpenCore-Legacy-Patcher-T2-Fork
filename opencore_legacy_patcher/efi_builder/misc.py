@@ -554,11 +554,16 @@ class BuildMiscellaneous:
             logging.exception("Stack Trace:") # This prints the full technical error
             logging.info("Please try again later.")
             sys.exit(3)
-
-        # This is the 'Magic' that makes grep VMM return something
-        logging.info("-Add Cpuid1Data and Cpuid1Mask NVRAM variables")
-        self.config["Kernel"]["Emulate"]["Cpuid1Data"] = binascii.unhexlify("00000000000000000000000000000080")
-        self.config["Kernel"]["Emulate"]["Cpuid1Mask"] = binascii.unhexlify("00000000000000000000000000000080")
+        try:
+            logging.info("- Disabling Library Validation")
+            support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(
+                self.config["Kernel"]["Patch"], "Comment", "Disable Library Validation Enforcement"
+            )["Enabled"] = True
+        except Exception as e:
+            logging.error("Disabling Library Validation Enforcement due to the following error:")
+            logging.exception("Stack Trace:") # This prints the full technical error
+            logging.info("Please try again later.")
+            sys.exit(3)
         # After ~20 SEP mailbox timeouts AppleSEPManagerIntel panics.
         # Patch converts the panic call to an early return.
         # 5. SEP Panic Patch Injection
