@@ -37,6 +37,8 @@ The Fix: The _set_nvram_value method allows for an overwrite=False flag. While I
 5. Code Readability and Maintenance
 By moving the NVRAM logic into helper functions, the "Business Logic" of the _build method is much easier to read. This reduces the "Human Error" vulnerability where a developer might copy-paste a line but forget to change the UUID or the key name.
 
+These all 5 conditions create Buffer Overflow vulnerabilities in the NVRAM.   
+
 Diese Version:
 
 - Fügt die Schaltfläche „Gemini fragen“ hinzu
@@ -80,6 +82,7 @@ Die Lösung: Die Methode `_set_nvram_value` ermöglicht die Option `overwrite=Fa
 
 5. Lesbarkeit und Wartbarkeit des Codes
 Durch die Auslagerung der NVRAM-Logik in Hilfsfunktionen ist die Geschäftslogik der Methode `_build` deutlich lesbarer. Dies reduziert die Anfälligkeit für menschliche Fehler, die entstehen können, wenn ein Entwickler eine Zeile kopiert und einfügt, aber vergisst, die UUID oder den Schlüsselnamen zu ändern.
+All die 5 erstellen Bedingungen für Buffer Overflow-Sicherheitslücken.
 
 ## 4.0.0 alpha 5 - the emergency update / der Notfallsupdate 🚨 :
 This release:
