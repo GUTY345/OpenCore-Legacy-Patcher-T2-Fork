@@ -7,6 +7,7 @@ import logging
 import threading
 import traceback
 import time
+import webbrowser
 
 from .. import constants
 
@@ -18,6 +19,19 @@ from ..wx_gui import (
     gui_support
 )
 
+class GeminiWebView(wx.Frame):
+    def __init__(self, parent, title, url="https://gemini.google.com"):
+        super().__init__(parent, title=title, size=(1000, 700))
+        
+        # Create the WebView
+        self.browser = wx.html2.WebView.New(self)
+        self.browser.LoadURL(url)
+        
+        self.Bind(wx.EVT_CLOSE, self.OnClose)
+        self.Centre()
+
+    def OnClose(self, event):
+        self.Destroy()
 
 class BuildFrame(wx.Frame):
     """
