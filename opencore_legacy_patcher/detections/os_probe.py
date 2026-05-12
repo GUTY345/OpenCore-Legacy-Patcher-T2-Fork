@@ -5,6 +5,7 @@ os_probe.py: OS Host information
 import platform
 import plistlib
 import subprocess
+from pathlib import Path
 
 
 class OSProbe:
@@ -73,11 +74,23 @@ class OSProbe:
             str: OS build (ex. 21A5522h)
         """
 
+        if rsr is False:
+            # sw_vers is the most reliable way to get the base host build
+            result = subprocess.run(["/usr/bin/sw_vers", "-buildVersion"], stdout=subprocess.PIPE)
+            if result.returncode == 0:
+                return result.stdout.decode().strip()
+
+        # Fallback/RSR logic using plist
         file_path = "/System/Library/CoreServices/SystemVersion.plist"
         if rsr is True:
             file_path = f"/System/Volumes/Preboot/Cryptexes/OS{file_path}"
 
-        try:
-            return plistlib.load(open(file_path, "rb"))["ProductBuildVersion"]
-        except Exception as e:
-            raise RuntimeError(f"Failed to detect OS build: {e}")
+        path_obj = Path(file_path)
+        if path_obj.exists():
+            try:
+                with path_obj.open("rb") as f:
+                    return plistlib.load(f)["ProductBuildVersion"]
+            except Exception as e:
+                raise RuntimeError(f"Failed to parse OS build plist: {e}")
+        
+        raise RuntimeError(f"Failed to detect OS build: {file_path} not found")
