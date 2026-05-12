@@ -576,6 +576,44 @@ class BuildMiscellaneous:
             logging.exception("Stack Trace:") # This prints the full technical error
             logging.info("Please try again later.")
             sys.exit(3)
+
+         # Target: NVRAM -> Add -> UUID -> auth-root-status
+         try:
+             logging.info("Setting auth-root-status to 00")
+             self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["auth-root-status"] = "00"
+         except Exception as e:
+             logging.error("We couldn't set auth-root-status to 00 because of the following error:")
+             logging.exception("Stack Trace:") # This prints the full technical error
+             logging.info("Please try again later.")
+             sys.exit(3)
+
+        try:
+            logging.info("Enabling CPUID masking")
+            vmm_spoof_val = "AAAAAAAAAAAAAIAAAAAAAAAAAA=="
+    
+            self.config["Kernel"]["Emulate"]["Cpuid1Data"] = vmm_spoof_val
+            self.config["Kernel"]["Emulate"]["Cpuid1Mask"] = vmm_spoof_val
+        except Exception as e:
+            logging.error("CPUID masking failed because of the following error:")
+            logging.exception("Stack Trace:") # This prints the full technical error
+            logging.info("Please try again later.")
+            sys.exit(3)
+        try:
+            logging.info("Set ReleaseUsbOwnership to True")
+            self.config["UEFI"]["Quirks"]["ReleaseUsbOwnership"] = True
+        except Exception as e:
+            logging.error("Setting ReleaseUsbOwnership to True failed because of the following error:")
+            logging.exception("Stack Trace:") # This prints the full technical error
+            logging.info("Please try again later.")
+            sys.exit(3)
+        try:
+            logging.info("Add mitigations for delays when booting from external bootable media")
+            self.config["UEFI"]["APFS"]["SetApfsTrimTimeout"] = -1
+        except Exception as e:
+            logging.error("Setting SetApfsTrimTimeout to -1 failed because of the following error:")
+            logging.exception("Stack Trace:") # This prints the full technical error
+            logging.info("Please try again later.")
+            sys.exit(3)
         
         # After ~20 SEP mailbox timeouts AppleSEPManagerIntel panics.
         # Patch converts the panic call to an early return.
@@ -597,33 +635,3 @@ class BuildMiscellaneous:
             logging.exception("Stack Trace:") # This prints the full technical error
             logging.info("Please try again later.")
             sys.exit(3)
-        
-        
-        # Path to your OpenCore config
-        config_path = '/Volumes/EFI/OC/config.plist'
-        
-        if os.path.exists(config_path):
-            with open(config_path, 'rb') as fp:
-                config = plistlib.load(fp)
-        
-            # Enable the ReleaseUsbOwnership quirk
-            try:
-                config['UEFI']['Quirks']['ReleaseUsbOwnership'] = True
-                logging.info("Success: ReleaseUsbOwnership set to True.")
-                
-                # Write the updated config back
-                with open(config_path, 'wb') as fp:
-                    plistlib.dump(config, fp, fmt=plistlib.FMT_XML)
-                    
-            except KeyError as e:
-                logging.error(f"Error: Could not find the specified path in plist: {e}")
-                logging.exception("Stack Trace:") # This prints the full technical error
-                logging.info("Please try again later.")
-                sys.exit(3)
-        else:
-            logging.error(f"Error: Could not find the specified path in plist: {e}")
-            logging.exception("Stack Trace:") # This prints the full technical error
-            logging.info("Please try again later.")
-            sys.exit(3)
-        
-        
