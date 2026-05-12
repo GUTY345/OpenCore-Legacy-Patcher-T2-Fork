@@ -405,8 +405,8 @@ class HardwarePatchsetDetection:
         device_properties = {}
         patches           = {}
 
-        # LOGIC FIX: Native Host Bypass for MacBookPro16,2 on Tahoe
-        if self._constants.computer.real_model == "MacBookPro16,2", "MacPro7,1" and self._xnu_major >= 26:
+       # LOGIC FIX: Native Host Bypass for MacBookPro16,2 and MacPro7,1 on Tahoe
+        if self._constants.computer.real_model in ["MacBookPro16,2", "MacPro7,1"] and self._xnu_major >= 26:
             self.can_patch = False
             self.can_unpatch = False
             self.device_properties = {"Status: Native Host": True}
