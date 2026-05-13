@@ -1,4 +1,81 @@
 # OpenCore Legacy Patcher T2 changelog / OpenCore Legacy Patcher T2-Änderungslog
+## 4.0.0 alpha 10:
+This release:
+
+the first one to be possible to run OpenCore Legacy Patcher T2 without running from source
+Adds OpenCore-Patcher-GUI.spec to be able to build the app
+Issue: since this is the first time it's possible to run this app outside source, it still expects a Terminal window to build OpenCore.
+Diese Version:
+
+ist die erste, die sie läuft, ohne dass Sie OpenCore Legacy Patcher T2 von Source laden
+Fügt OpenCore-Patcher-GUI.spec, um den App zu ermöglichen, zu bauen
+Fehler: dies ist die erste Version, der ohne laufen von Source möglich ist. Aber, um OpenCore zu bauen, erwartet noch einen Terminalfenster und bricht ab.
+
+## 4.0.0 alpha 9:
+Thanks @GUTY345 for contributing to this project!
+This release:
+
+finalizes security patches done in gui_settings.py in alpha 5 as there were bugs where when disabling or changing some settings the app may crash
+
+fixes a bug where when not choosing a specific SMBIOS via Settings, Build returned None, which could result in improper patches or Build OpenCore to be grayed out
+
+added an SSDT for the 2018 MacBook Pro from #35; requires reverse engineering to become universal for all T2 Macs
+
+Adds T2 patches, Intel UHD Graphics 630 patches, and fixes incorrect NVRAM variables
+
+Adds 2 more buttons if building EFI fails with an error:
+
+Report Issue (which opens your default browser)
+
+Ask Gemini
+
+Fix the following vulnerabilities:
+
+Hardware Detection "Poisoning" (Logic Fix)
+In your original file, the smbios_probe method prioritized NVRAM variables like oem-product over the actual hardware data. If you had previously used OCLP to spoof your Mac as a different model, the app would get "stuck" seeing that spoofed ID even when running on your native MacBookPro16,2.
+The Fix: I added a "Native Support Bypass." The code now checks if the reported_model is a known T2 Intel Mac (like the Macmini8,1 or MacBookPro16,2). If it matches, the app ignores the spoofed NVRAM variables and uses the real hardware ID. This ensures your 2020 MacBook is seen as "Supported" rather than "Unsupported."
+
+Cryptographic Weakness (SHA-1 to SHA-256)
+The original code used hashlib.sha1 to generate a unique hardware identifier from the IOPlatformUUID. SHA-1 is considered cryptographically "broken" because it is vulnerable to collision attacks, where two different inputs produce the same hash.
+The Fix: I updated the hashing logic to use SHA-256. This provides a significantly higher level of security for hardware identification. It prevents a scenario where a malicious script could spoof a "trusted" hardware ID by matching a SHA-1 hash, which is technically possible on modern hardware.
+
+Subprocess Execution Hardening
+In the original script, several subprocess.run calls lacked explicit safety checks or proper handling of system paths. While not a direct "exploit" in a vacuum, it is a common vector for Command Injection if the script is ever modified to accept user-defined variables.
+The Fix: The updated file standardizes the use of absolute paths (e.g., /usr/sbin/sysctl) and ensures that output is handled via stdout=subprocess.PIPE without using shell=True. This prevents the shell from interpreting special characters that might be injected via system properties.
+
+T2 Security State Verification
+The logic for checking Secure Boot and the T2 chip was simplified to ensure it doesn't accidentally report a "False Negative" if the chip is in a non-standard state (like "Medium Security").
+The Fix: By ensuring the t1_probe and smbios_probe correctly identify the T2 interface even when AMFI (Apple Mobile File Integrity) is toggled, the app avoids crashing or reporting "Unsupported" simply because the security policy is currently lowered for development.
+
+Shell Command InjectionVulnerability: The original code used subprocess.run with a single string and shell=True (or implicitly allowed shell interpretation) when calling /usr/bin/fdesetup status. This is a classic injection point where a malicious actor could potentially inject arbitrary commands if system variables were tampered with. The Fix: The code now uses list-based arguments: subprocess.run(["/usr/bin/fdesetup", "status"], ...) with shell=False. This ensures that the system treats "status" strictly as an argument and not as part of a command string, closing the injection window.
+
+Logic-Based Denial of Service (DoS)Vulnerability: In the _handle_sip_breakdown method, the previous logic assumed the SIP_ENABLED key always existed in the requirements dictionary. If a specific hardware configuration caused that key to be missing, the application would crash during the dictionary index lookup.The Fix: Added a safe existence check (if HardwarePatchsetValidation.SIP_ENABLED in requirements:) before performing the index operation. This prevents the patcher from crashing on unexpected hardware profiles.
+
+Insecure Hardware Mixing (Hardware Identification Bug)Vulnerability: The patcher previously could allow a "mixed" state where both Metal and Non-Metal patches were queued for the same system. On macOS Sequoia and Tahoe, this can lead to kernel panics or a "black screen" boot loop because the system cannot handle conflicting graphics acceleration kexts. The Fix: Strengthened the _strip_incompatible_hardware logic. It now strictly enforces a hierarchy: if any Metal GPU is detected, all Non-Metal hardware is purged from the patch list. It also specifically prevents Metal 3802 and Metal 31001 graphics from being mixed on Sequoia or newer, which is a known cause of system instability.
+
+Native Host Bypass (The "Tahoe Logic" Bug)Logic Fix: For users on newer Intel Macs (like the 2020 MacBook Pro 16,2 or Mac mini 8,1), the original code might still attempt to apply legacy patches when running macOS Tahoe. This refactor includes a specific check for these models to identify them as "Native" and immediately disable patching, preventing the installation of unnecessary kexts that could break native security features like the T2 chip's integrity checks.
+
+Data Integrity & Consistency
+The "Empty Patch" Safety: In the original code, can_patch was sometimes set to True even if no actual patches were found for the system. This could lead to the UI showing a "Start Patching" button that does nothing. The refactor adds a check: self.can_patch = (not _cant_patch) and (len(patches) > 0). Now, if your hardware is already supported natively, the patcher won't offer to "fix" it.
+Dictionary Initialization: The device_properties and patches attributes are now explicitly initialized as empty dictionaries ({}) in the constructor. This prevents "AttributeError" crashes if _detect() fails or exits early due to an error.
+
+Refined Hardware Filtering
+Sequoia/Tahoe Specificity: The logic for stripping incompatible hardware was updated to be "OS-aware." For example, it now specifically checks self._xnu_major >= os_data.sequoia.value before stripping certain Metal 3802 graphics drivers. This ensures that users on older versions of macOS (like Big Sur) don't lose driver support that was perfectly stable on those older systems.
+AMFI Level Escalation: The original code could sometimes fluctuate on which AMFI (Apple Mobile File Integrity) level to require. The refactor uses a "highest wins" logic (if item.required_amfi_level() > highest_amfi_level), ensuring that if one hardware component needs a high security bypass, the entire system is configured to support it, preventing partial boots where the GPU works but the WiFi doesn't.
+
+Error Handling & Performance
+Recursive SIP Decoding Fix: The _handle_sip_breakdown function was rewritten to be more efficient. Instead of repeatedly looping through SIP configurations, it performs a single lookup to generate the "Expected vs Booted" status string. This makes the UI feedback significantly faster on older CPUs like the Core 2 Duo.
+Path Resolution: Used Path("~/.dortania_developer").expanduser().exists() instead of raw string manipulation. This is more cross-platform (helpful for developers testing on Windows/Linux) and handles edge cases where the home directory might be on a non-standard mount point.
+
+## 4.0.0 alpha 8
+This release:
+
+Fixes a bug where when the EFI is ready, the popup crashes
+
+Diese Version:
+
+Behebt einen Fehler, der zum Absturz des Popups führte, sobald die EFI bereit war.
+
 ## 4.0.0 alpha 7:
 This release:
 - Fixes a bug where when the EFI is ready, the popup crashes
