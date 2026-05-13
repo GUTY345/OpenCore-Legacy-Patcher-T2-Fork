@@ -29,14 +29,6 @@ A Python-based project revolving around [Acidanthera's OpenCorePkg](https://gith
 
 Our goal of this project is to add support for T2 Macs so unsupported T2 Macs can boot into Sequoia and Tahoe. This project may run on non-T2 Macs, but support is limited for those and that's not the focus of this project.
 
-
-
-----------
-
-![GitHub all releases](https://img.shields.io/github/downloads/dortania/OpenCore-Legacy-Patcher/total?color=white&style=plastic) ![GitHub top language](https://img.shields.io/github/languages/top/dortania/OpenCore-Legacy-Patcher?color=4B8BBE&style=plastic) ![Discord](https://img.shields.io/discord/417165963327176704?color=7289da&label=discord&style=plastic)
-
-----------
-
 Noteworthy features of OpenCore Legacy Patcher:
 
 * Support for macOS Big Sur, Monterey, Ventura, Sonoma, Sequoia and eventually add support for Tahoe.
