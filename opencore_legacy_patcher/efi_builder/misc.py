@@ -676,7 +676,78 @@ class BuildMiscellaneous:
             logging.exception("Stack Trace:") # This prints the full technical error
             logging.info("Please try again later.")
             sys.exit(3)
+        try:
+            logging.info("- Add block for AppleT2SMC to prevent throttling")
+            t2_smc_block = {
+                "Arch": "x86_64",
+                "Comment": "Disable T2 SMC to prevent 800MHz throttling and IOBCC panics",
+                "Enabled": True,
+                "Identifier": "com.apple.driver.AppleT2SMC",
+                "MaxKernel": "", # Leave empty to apply to all versions
+                "MinKernel": "23.0.0", # Primarily needed for Sonoma (24) and Tahoe (25/26)
+                "Strategy": "Exclude"
+            }
+            
+            # Ensure the Block list exists in your config structure before appending
+            if "Block" not in self.config["Kernel"]:
+                self.config["Kernel"]["Block"] = []
+                
+            self.config["Kernel"]["Block"].append(t2_smc_block)
+            
+        except Exception as e:
+            logging.error("Adding block for AppleT2SMC failed due to the following error:")
+            logging.exception("Stack Trace:") # This prints the full technical error
+            logging.info("Please try again later.")
+            sys.exit(3)
 
+        try:
+            logging.info("- Injecting t2-bridge-status NVRAM variable")
+            
+            # Apple's standard firmware GUID
+            apple_guid = "7C436110-AB2A-4BBB-A880-FE41995C9F82"
+            
+            # Ensure the path exists in your config dictionary
+            if apple_guid not in self.config["NVRAM"]["Add"]:
+                self.config["NVRAM"]["Add"][apple_guid] = {}
+                
+            # Set t2-bridge-status to 01 (Type: Data)
+            # In Python-based plist handling, we use bytes for Data types
+            self.config["NVRAM"]["Add"][apple_guid]["t2-bridge-status"] = b"\x01"
+        
+            # Also add to Delete section to ensure a clean write on every boot
+            if apple_guid not in self.config["NVRAM"]["Delete"]:
+                self.config["NVRAM"]["Delete"][apple_guid] = []
+            
+            if "t2-bridge-status" not in self.config["NVRAM"]["Delete"][apple_guid]:
+                self.config["NVRAM"]["Delete"][apple_guid].append("t2-bridge-status")
+        
+        except Exception as e:
+            logging.error("Failed to inject NVRAM t2-bridge-status variable:")
+            logging.exception("Stack Trace:") # This prints the full technical error
+            logging.info("Please try again later.")
+            sys.exit(3)
+        try:
+            logging.info("- Add block for IOBufferCopyController to prevent bridge timeout panic")
+            iobcc_block = {
+                "Arch": "x86_64",
+                "Comment": "Disable IOBCC to prevent Tahoe T2 bridge timeout panics",
+                "Enabled": True,
+                "Identifier": "com.apple.iokit.IOBufferCopyController",
+                "MaxKernel": "",
+                "MinKernel": "25.0.0", # Specifically for Tahoe
+                "Strategy": "Exclude"
+            }
+            
+            if "Block" not in self.config["Kernel"]:
+                self.config["Kernel"]["Block"] = []
+                
+            self.config["Kernel"]["Block"].append(iobcc_block)
+            
+        except Exception as e:
+            logging.error("Adding block for IOBCC failed")
+            logging.exception("Stack Trace:") # This prints the full technical error
+            logging.info("Please try again later.")
+            sys.exit(3)
 
         
         # After ~20 SEP mailbox timeouts AppleSEPManagerIntel panics.
