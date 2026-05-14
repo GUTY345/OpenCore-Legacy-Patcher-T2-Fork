@@ -616,6 +616,26 @@ class BuildMiscellaneous:
             logging.exception("Stack Trace:") # This prints the full technical error
             logging.info("Please try again later.")
             sys.exit(3)
+        try:
+            logging.info("- Add specific fix for Tahoe 26.4.1+ T2 event mismatch")
+            logging.info("To be exact, it's an AppleIntelUSBXHC bypass")
+            tahoe_handshake_patch = {
+                "Arch": "x86_64",
+                "Comment": "Bypass AppleIntelUSBXHC T2 handshake (Tahoe 26.4.1 or newer)",
+                "Enabled": True,
+                "Identifier": "com.apple.driver.appleusbxhci",
+                # Find: 74 0E 48 8B 05 (JZ to panic location)
+                "Find": b"\x74\x0E\x48\x8B\x05",
+                # Replace: EB 0E 48 8B 05 (JMP past panic location)
+                "Replace": b"\xEB\x0E\x48\x8B\x05",
+                "MinKernel": "25.4.0" # Specifically for 26.4 and higher
+            }
+            self.config["Kernel"]["Patch"].append(tahoe_handshake_patch)
+        except Exception as e:
+            logging.error("Adding bypass for AppleIntelUSBXHC failed due to the following error:")
+            logging.exception("Stack Trace:") # This prints the full technical error
+            logging.info("Please try again later.")
+            sys.exit(3)
 
         
         # After ~20 SEP mailbox timeouts AppleSEPManagerIntel panics.
