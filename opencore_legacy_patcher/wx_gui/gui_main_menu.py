@@ -264,15 +264,16 @@ class MainFrame(wx.Frame):
         # 3. Trigger update
         logging.info(f"Newer version detected: {remote_version_str}")
         wx.CallAfter(self.on_update, update_dict["Link"], remote_version_str, update_dict["Github Link"])
-        def on_build_and_install(self, event: wx.Event = None):
-            self.Hide()
-            gui_build.BuildFrame(
-                parent=None,
-                title=self.title,
-                global_constants=self.constants,
-                screen_location=self.GetPosition()
-            )
-            self.Destroy()
+    
+    def on_build_and_install(self, event: wx.Event = None):
+        self.Hide()
+        gui_build.BuildFrame(
+            parent=None,
+            title=self.title,
+            global_constants=self.constants,
+            screen_location=self.GetPosition()
+        )
+        self.Destroy()
 
 
     def on_post_install_root_patch(self, event: wx.Event = None):
