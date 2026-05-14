@@ -612,8 +612,14 @@ class BuildMiscellaneous:
             logging.exception("Stack Trace:") # This prints the full technical error
             logging.info("Please try again later.")
             sys.exit(3)
-        
-        self.run_sequence()
+        try:
+            logging.info("Adding Booter Quirks patches for T2 Macs")
+            self.run_sequence()
+        except Exception as e:
+            logging.error("We have issues calling the ref_sequence function due to the following error:")
+            logging.exception("Stack Trace:") # This prints the full technical error
+            logging.info("Please try again later.")
+            sys.exit(3)
     
     def run_sequence(self):
         # 1. Run misc.py
