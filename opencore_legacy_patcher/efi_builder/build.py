@@ -148,33 +148,31 @@ class BuildOpenCore:
                 logging.info("- Setting PanicNoKextDump to True for T2 Macs")
                 self.config["Kernel"]["Quirks"]["PanicNoKextDump"] = True
 
-                if self.model != "Macmini8,1":
-                    if self.model != "iMacPro1,1":
-                        ssdt_file = "SSDT-T2-FAKE.aml"
-                        ssdt_src = self.constants.payload_path / "ACPI" / ssdt_file
-                        if ssdt_src.exists():
-                            logging.info(f"- Adding {ssdt_file} for T2 bypass")
-                            if "ACPI" not in self.config:
-                                self.config["ACPI"] = {}
-                            if "Add" not in self.config["ACPI"]:
-                                self.config["ACPI"]["Add"] = []
-                            acpi_add = self.config["ACPI"]["Add"]
-                            # Check if already present
-                            found = False
-                            for item in acpi_add:
-                                if item.get("Path") == ssdt_file:
-                                    item["Enabled"] = True
-                                    item["Comment"] = "Disable T2 peripherals to prevent bridge unresponsive panics"
-                                    found = True
-                                    break
-                            if not found:
-                                acpi_add.append({
-                                    "Comment": "Disable T2 peripherals to prevent bridge unresponsive panics",
-                                    "Enabled": True,
-                                    "Path": ssdt_file
-                                })
-                            # Copy SSDT to output ACPI directory
-                            shutil.copy(ssdt_src, self.constants.acpi_path)
+                ssdt_file = "SSDT-T2-FAKE.aml"
+                ssdt_src = self.constants.payload_path / "ACPI" / ssdt_file
+                if ssdt_src.exists():
+                    logging.info(f"- Adding {ssdt_file} for T2 bypass")
+                    if "ACPI" not in self.config:
+                        self.config["ACPI"] = {}
+                    if "Add" not in self.config["ACPI"]:
+                        self.config["ACPI"]["Add"] = []
+                    acpi_add = self.config["ACPI"]["Add"]
+                    # Check if already present
+                    found = False
+                    for item in acpi_add:
+                        if item.get("Path") == ssdt_file:
+                            item["Enabled"] = True
+                            item["Comment"] = "Disable T2 peripherals to prevent bridge unresponsive panics"
+                            found = True
+                            break
+                    if not found:
+                        acpi_add.append({
+                            "Comment": "Disable T2 peripherals to prevent bridge unresponsive panics",
+                            "Enabled": True,
+                            "Path": ssdt_file
+                        })
+                    # Copy SSDT to output ACPI directory
+                    shutil.copy(ssdt_src, self.constants.acpi_path)
             except Exception as e:
                 logging.error("Whoops, the app failed to inject the required kexts because of the following error:")
                 logging.exception("Stack Trace:") # This prints the full technical error
