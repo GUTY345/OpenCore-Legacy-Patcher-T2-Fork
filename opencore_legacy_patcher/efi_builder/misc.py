@@ -16,7 +16,7 @@ from .. import constants
 
 from ..support import generate_smbios
 from ..detections import device_probe
-from t2smbiossecurity import t2smbiossettings
+from ..t2smbiossecurity import t2smbiossettings
 
 from ..datasets import (
     model_array,
