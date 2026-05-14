@@ -247,7 +247,7 @@ class MainFrame(wx.Frame):
     
         try:
             # 2. Robust Comparison
-            remote_v = version.parse(remote_version_str)
+            remote_v = version.parse(str(remote_version_str))
             local_v = version.parse(local_version_str)
     
             # Only trigger if remote is NEWER. 
