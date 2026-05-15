@@ -110,19 +110,6 @@ class BuildOpenCore:
             self.constants.set_vmm_cpuid = False
 
         if "T2_CHIP" in self.constants.device_properties.get(self.model, {}).get("Features", []):
-            try:
-                logging.info("- Importing t2smbiossecurity")
-                from ..efi_builder import t2smbiossecurity
-                try:
-                    logging.info("- Add Booter Quirks patches for T2 Macs ")
-                    # Updated to match function name in t2smbiossecurity.py
-                    t2smbiossecurity.finalize_t2_tahoe(self.constants.plist_path)
-                except Exception as e:
-                    logging.error("Whoops, the function finalize_t2_tahoe_internal failed to run because of the following error:")
-                    logging.exception("Stack Trace:") # This prints the full technical error
-                    logging.info("Please try again later.")
-                    sys.exit(3)
-
                 logging.info("- Adding T2-specific bypass NVRAM variables")
             
                 # Append T2-specific boot args to the existing boot-args string
