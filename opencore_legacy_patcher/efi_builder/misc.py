@@ -749,6 +749,26 @@ class BuildMiscellaneous:
             logging.info("Please try again later.")
             sys.exit(3)
 
+        try:
+            logging.info("- Add AppleKeyStore T2 compatibility patch")
+            keystore_patch = {
+                "Arch": "x86_64",
+                "Comment": "Bypass AppleKeyStore T2 entropy check (Tahoe)",
+                "Enabled": True,
+                "Identifier": "com.apple.driver.AppleKeyStore",
+                # Find: 48 85 C0 74 08 48 8B 00 (Check for T2 response)
+                "Find": b"\x48\x85\xC0\x74\x08\x48\x8B\x00",
+                # Replace: 48 85 C0 EB 08 48 8B 00 (Force jump past failure)
+                "Replace": b"\x48\x85\xC0\xEB\x08\x48\x8B\x00",
+                "MinKernel": "25.0.0"
+            }
+            self.config["Kernel"]["Patch"].append(keystore_patch)
+        except Exception as e:
+            logging.error("Adding AppleKeyStore patch failed")
+            logging.exception("Stack Trace:") # This prints the full technical error
+            logging.info("Please try again later.")
+            sys.exit(3)
+
         
         # After ~20 SEP mailbox timeouts AppleSEPManagerIntel panics.
         # Patch converts the panic call to an early return.
