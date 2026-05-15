@@ -778,7 +778,7 @@ class BuildMiscellaneous:
         
             # Spoof the BridgeOS version to Tahoe 26.x
             # The format must be a byte string (Data type in plist)
-            self.config["NVRAM"]["Add"][apple_guid]["bridge-os-version"] = b"26.16.1047.0.0,0"
+            self.config["NVRAM"]["Add"][apple_guid]["bridge-os-version"] = b"23.16.15067.0.0,0"
             
             # Ensure t2-bridge-status is also present
             self.config["NVRAM"]["Add"][apple_guid]["t2-bridge-status"] = b"\x01"
