@@ -1,95 +1,107 @@
 <div align="center">
-             <img src="https://raw.githubusercontent.com/dortania/OpenCore-Legacy-Patcher/main/docs/images/OC-Patcher.png" alt="OpenCore Patcher Logo" width="256" />
-             <h1>OpenCore Legacy Patcher for T2 Macs</h1>
-             <p><b>(Mathachai's Bug Fix & Maintenance Branch)</b></p>
+  <img src="https://raw.githubusercontent.com/dortania/OpenCore-Legacy-Patcher/main/docs/images/OC-Patcher.png" alt="OpenCore Patcher Logo" width="200" />
+  <h1>🚀 OpenCore Legacy Patcher (T2 Branch)</h1>
+  <p><b>Custom Maintenance & Bug Fixes for macOS Tahoe/Sequoia on T2 Macs</b></p>
+  <p><i>สาขาสำหรับการบำรุงรักษาและแก้ไขบัคสำหรับเครื่อง T2 โดยเฉพาะ</i></p>
+
+  [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/GUTY345/OpenCore-Legacy-Patcher-T2-main)
+  [![Platform](https://img.shields.io/badge/Platform-macOS%20Tahoe%20%7C%20Sequoia-blue.svg)](https://github.com/GUTY345/OpenCore-Legacy-Patcher-T2-main)
 </div>
 
 ---
 
-### **[TH] เกี่ยวกับ Repo นี้**
-Repo นี้จัดทำขึ้นเพื่อ **รวบรวมการแก้ไขบัค (Bug Fixes)** และปรับปรุงเสถียรภาพเพิ่มเติมจากโปรเจกต์หลัก เพื่อให้การใช้งานบนเครื่อง T2 Mac มีความราบรื่นที่สุด โดยเฉพาะปัญหาที่พบใน macOS รุ่นใหม่อย่าง Sequoia และ Tahoe
-
-**🔗 โปรเจกต์หลัก (Main Project):** สามารถติดตามและดาวน์โหลดเวอร์ชันต้นทางได้ที่: [albert-mueller/OpenCore-Legacy-Patcher-T2](https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2.git)
-
-#### **รายการที่แก้ไขเพิ่มเติมใน Repo นี้:**
-- [x] **UI/UX Fix:** แก้ไขปัญหาปุ่ม "Continue" เป็นสีเทา (กดไม่ได้) ในหน้า Installer ของ T2 Mac
-- [x] **Logic Fix:** ปรับปรุง `security.py` เพื่อแก้ปัญหาความปลอดภัยและอาการค้าง (Stall) ระหว่างบูต
-- [x] **Stability:** แก้ไขปัญหา `AttributeError` และ Bug อื่นๆ ที่ทำให้การ Build EFI ไม่สมบูรณ์
+## 📖 Table of Contents / สารบัญ
+1. About / เกี่ยวกับโปรเจกต์
+2. Key Fixes / รายการการแก้ไข
+3. Supported Models / รุ่นที่รองรับ
+4. Getting Started / วิธีการใช้งาน
+5. Post-Installation / คำสั่งหลังติดตั้ง
 
 ---
 
-### **[EN] About This Repo**
-This repository is dedicated to **bug fixes and maintenance** for the T2-supported branch of OpenCore Legacy Patcher. It aims to resolve specific issues encountered during the development and installation of newer macOS versions on T2 Macs.
+## ℹ️ About / เกี่ยวกับโปรเจกต์
 
-**🔗 Main Project Link:** Please refer to the primary upstream repository for core updates: [albert-mueller/OpenCore-Legacy-Patcher-T2](https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2.git)
+**[TH]** Repo นี้จัดทำขึ้นเพื่อรวบรวมการแก้ไขบัค (Bug Fixes) และปรับปรุงเสถียรภาพเพิ่มเติมจากโปรเจกต์หลัก เพื่อให้เครื่อง **T2 Mac** ใช้งาน macOS Sequoia และ Tahoe ได้ราบรื่นที่สุด
 
-#### **Key Fixes in this Branch:**
-- [x] **Installer UI Fix:** Resolved the "Grayed out Continue button" issue on T2 Macs during setup.
-- [x] **Security Logic:** Patched `security.py` to bypass boot hangs and improve ASP (Apple System Policy) compatibility.
-- [x] **Build Fixes:** Resolved `AttributeError` and script crashes during the EFI creation process.
+**[EN]** This repository focuses on maintenance and stability improvements for **T2 Macs**. It resolves specific issues found when running macOS Sequoia and Tahoe via OpenCore.
+
+> **Main Project:** albert-mueller/OpenCore-Legacy-Patcher-T2
 
 ---
 
-### **📋 รายการการแก้ไขเชิงลึก (Detailed Change Log)**
+## 🛠️ Key Fixes (Detailed Change Log) / รายการการแก้ไขเชิงลึก
 
-#### **1. Graphics & UI Fixes (ระบบกราฟิกและอินเตอร์เฟซ)**
-* **Connector-less UHD630 Injection**: บังคับฉีด `ig-platform-id` เป็น `06009B3E` สำหรับ Intel UHD 630 เพื่อป้องกัน APFS race condition บน Tahoe ที่ทำให้ระบบค้าง
-* **Force GPU Online**: เพิ่ม Boot-arg `igfxonln=1` ป้องกันปัญหาปุ่มกดในหน้าติดตั้งไม่ตอบสนอง (UI Stall)
-* **GPU Power Management**: ตั้งค่า `forceRenderStandby=0` ปิดโหมดประหยัดพลังงาน GPU ระหว่างบูต
-* **Graphics Firmware**: บังคับใช้ Apple Graphics Firmware ด้วย `igfxfw=2` เพื่อเสถียรภาพสูงสุด
+### 📺 Graphics & UI / กราฟิกและอินเตอร์เฟซ
+| Feature | Detail (EN) | รายละเอียด (TH) |
+| :--- | :--- | :--- |
+| **UHD630 Injection** | Forced `06009B3E` to prevent APFS race condition. | บังคับฉีด ID ป้องกันเครื่องค้างจาก APFS |
+| **GPU Online** | Added `igfxonln=1` to fix unresponsive buttons. | แก้ไขปุ่ม Continue กดไม่ได้ในหน้าติดตั้ง |
+| **GPU Power** | `forceRenderStandby=0` to prevent boot hangs. | ปิดโหมดประหยัดพลังงาน GPU ระหว่างบูต |
 
-#### **2. Kernel & Stability Patches (ความเสถียรของ Kernel)**
-* **SEP Manager Patch**: เปลี่ยน `panic` เป็น `return` ใน `AppleSEPManager` เพื่อแก้ปัญหาเครื่องรีสตาร์ทเอง
-* **IOBCC Block**: บล็อกไดรเวอร์ `IOBufferCopyController` ป้องกัน Kernel Panic "timed out" บน macOS Tahoe
-* **T2 Boot Overrides**: บังคับตั้งค่า `SecureBootModel = Disabled` และ `ApECID = 0` เพื่อการันตีการบูต
+### 🧠 Kernel & Stability / ความเสถียรของระบบ
+| Feature | Detail (EN) | รายละเอียด (TH) |
+| :--- | :--- | :--- |
+| **SEP Manager** | Patched panic to return to prevent reboots. | แก้ไข Kernel Panic จากระบบความปลอดภัย SEP |
+| **IOBCC Block** | Blocked `IOBufferCopyController` timeout fix. | บล็อกไดรเวอร์ที่ทำให้ Tahoe เกิดอาการ Timeout |
+| **USB Timeout** | Increased to `0xFF` for instant HID response. | ขยายเวลา USB ให้เมาส์/คีย์บอร์ดตอบสนองไวขึ้น |
 
-#### **3. Storage & I/O Fixes (ระบบจัดเก็บข้อมูลและอุปกรณ์เชื่อมต่อ)**
-* **NVMe Mount Fix**: เพิ่ม `nvme_shutdown_timestamp=0` แก้ปัญหาการเมานท์พาร์ทิชัน APFS ค้าง (Stall)
-* **USB Timeout Extension**: ขยายเวลา `AppleIntelUSBXHC` Timeout เป็น 255ms (0xFF) ให้เมาส์/คีย์บอร์ดใช้งานได้ทันที
-* **USB Handshake Bypass**: แพตช์ข้ามขั้นตอน T2 USB handshake ป้องกันอุปกรณ์ค้างระหว่างเริ่มต้นระบบ
-* **APFS Stability**: ปิดการตรวจสอบ GPU ของ APFS และเปิด `keepsyms=1` เพื่อให้การ Replay Journal ทำงานสมบูรณ์
-
----
-
-## Detailed Change Log [EN]
-
-### 1. Graphics & UI Fixes
-
-* **Connector-less UHD630 Injection:** Forced `ig-platform-id = 06009B3E` injection for Intel UHD 630 to prevent the APFS race condition on Tahoe that causes system freezes.
-* **Force GPU Online:** Added the boot argument `igfxonln=1` to prevent installer UI stalls and unresponsive buttons during setup.
-* **GPU Power Management:** Set `forceRenderStandby=0` to disable GPU power-saving mode during boot.
-* **Graphics Firmware:** Forced Apple Graphics Firmware loading with `igfxfw=2` for maximum stability.
-
-### 2. Kernel & Stability Patches
-
-* **SEP Manager Patch:** Replaced kernel panic behavior with a return routine in `AppleSEPManager` to prevent unexpected system reboots.
-* **IOBCC Block:** Blocked the `IOBufferCopyController` driver to avoid `"timed out"` Kernel Panic issues on macOS Tahoe.
-* **T2 Boot Overrides:** Forced `SecureBootModel = Disabled` and `ApECID = 0` to ensure reliable boot compatibility.
-
-### 3. Storage & I/O Fixes
-
-* **NVMe Mount Fix:** Added `nvme_shutdown_timestamp=0` to resolve APFS partition mount stalls during boot.
-* **USB Timeout Extension:** Extended `AppleIntelUSBXHC` timeout to `255ms (0xFF)` so the mouse and keyboard become responsive immediately after boot.
-* **USB Handshake Bypass:** Patched and bypassed the T2 USB handshake process to prevent USB devices from freezing during system startup.
-* **APFS Stability:** Disabled APFS GPU verification and enabled `keepsyms=1` to ensure proper APFS journal replay functionality.
+### 💾 Storage & I/O / ข้อมูลและการเชื่อมต่อ
+| Feature | Detail (EN) | รายละเอียด (TH) |
+| :--- | :--- | :--- |
+| **NVMe Fix** | `nvme_shutdown_timestamp=0` for APFS mount. | แก้ปัญหาการเมานท์พาร์ทิชัน APFS ค้าง |
+| **USB Handshake** | Bypassed T2 handshake to prevent boot stall. | ข้ามขั้นตอนเช็ค USB เพื่อไม่ให้เครื่องค้างตอนเริ่ม |
 
 ---
 
-### **💻 รุ่นที่รองรับ (Supported Models)**
-* **MacBook Pro**: 15,1 / 15,3 / 16,1 / 16,4
-* **Mac mini**: 8,1
-* **MacBook Air**: 8,1 / 8,2 / 9,1
-* **Mac Pro**: 7,1
+## 💻 Supported Models / รุ่นที่รองรับ
+*   **MacBook Pro:** 15,1 / 15,3 / 16,1 / 16,4
+*   **Mac mini:** 8,1
+*   **MacBook Air:** 8,1 / 8,2 / 9,1
+*   **Mac Pro:** 7,1
 
 ---
 
-## ⚠️ Disclaimer
-โปรเจกต์นี้เป็นการนำซอร์สโค้ดมาปรับปรุงเพื่อแก้ปัญหาเฉพาะหน้า (Experimental Bug Fixes) การใช้งานมีความเสี่ยง กรุณาสำรองข้อมูลสำคัญก่อนดำเนินการทุกครั้ง
+## 🚀 Getting Started / วิธีการใช้งานเบื้องต้น
 
-**หมายเหตุสำคัญ:** เพื่อให้แพตช์ทำงานสมบูรณ์บน Tahoe ต้องรันคำสั่ง `csrutil authenticated-root disable` ใน Recovery Mode
+### 1️⃣ Prerequisites / การเตรียมระบบ
+*   **Python 3.10+**
+*   **Git** & **Xcode Command Line Tools**
 
-## Credits
-ขอขอบคุณผู้พัฒนาหลักและทีมงาน OCLP ทุกท่าน:
-* **Albert Müller** - ผู้พัฒนาหลักของ [T2-specific branch](https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2)
-* **Dortania & Acidanthera** - ทีมพัฒนา OpenCore และ OCLP ต้นฉบับ
-* และเหล่านักพัฒนาในชุมชน Open Source ทุกคนที่ร่วมกันทำให้เครื่อง Mac รุ่นเก่าไปต่อได้
+### 2️⃣ Installation / การติดตั้ง
+```bash
+# Clone and setup / ดาวน์โหลดและติดตั้ง
+git clone https://github.com/GUTY345/OpenCore-Legacy-Patcher-T2-main.git
+cd OpenCore-Legacy-Patcher-T2-main
+pip3 install -r requirements.txt
+```
+
+### 3️⃣ Running / การเริ่มโปรแกรม
+*   **GUI Mode:** `python3 OpenCore-Patcher-GUI.command`
+*   **CLI Mode:** `python3 OpenCore-Patcher.py`
+
+---
+
+## 🛠️ Post-Installation Commands / คำสั่งที่ต้องรันหลังติดตั้ง
+
+> [!IMPORTANT]
+> **[TH]** เพื่อให้ Patch ทำงานสมบูรณ์บน Tahoe ต้องรันคำสั่งเหล่านี้ใน Recovery Mode (Terminal)
+> **[EN]** For full functionality on Tahoe, run these in Recovery Mode Terminal:
+
+```bash
+csrutil disable
+csrutil authenticated-root disable
+```
+
+---
+
+## ⚠️ Disclaimer / ข้อความระวัง
+
+**[TH]** โปรเจกต์นี้เป็นการแก้ไขเพื่อทดสอบ (Experimental) การใช้งานมีความเสี่ยง กรุณาสำรองข้อมูลก่อนดำเนินการ
+**[EN]** This is an experimental branch. Use at your own risk. Always back up your data before patching.
+
+---
+
+## 🤝 Credits / ทีมงาน
+*   **Albert Müller** - T2-specific branch lead.
+*   **Dortania & Acidanthera** - Original OCLP developers.
+*   **Mathachai** - Maintenance & Tahoe specific fixes.
