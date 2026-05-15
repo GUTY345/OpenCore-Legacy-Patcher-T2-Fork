@@ -316,6 +316,19 @@ class BuildSecurity:
                 "MinKernel": "25.0.0"
             })
 
+        # 5. Patch AppleTouchBarHIDEventDriver
+        # Resolves Touch Bar stall/hang on macOS Tahoe
+        if not patch_exists("Patch AppleTouchBarHIDEventDriver (Tahoe fix)"):
+            kernel_patches.append({
+                "Arch": "x86_64",
+                "Comment": "Patch AppleTouchBarHIDEventDriver (Tahoe fix)",
+                "Enabled": True,
+                "Identifier": "com.apple.driver.AppleTouchBarHIDEventDriver",
+                "Find": binascii.unhexlify("4883C4085B415C415D415E415F5DC3"),
+                "Replace": binascii.unhexlify("31C04883C4085B415C415D415E415F5DC3"),
+                "MinKernel": "25.0.0"
+            })
+
     # ------------------------------------------------------------------
     # Main build entry point
     # ------------------------------------------------------------------
