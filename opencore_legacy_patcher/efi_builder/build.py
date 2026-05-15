@@ -64,6 +64,29 @@ class BuildOpenCore:
             logging.error(f"Function Error: {e}")
             sys.exit(3)
 
+    def _remove_conflicting_t2_ssdt(self) -> None:
+        """
+        Removes SSDT-T2-Fake.aml if a T2 Mac is detected, to prevent conflicts
+        with newer T2-specific kernel patches and boot-args.
+        """
+        # Check if the current model is a T2 Mac by checking for the "T2_CHIP" feature.
+        # This relies on constants.device_properties being populated, which happens
+        # during the defaults generation phase.
+        is_t2_mac = "T2_CHIP" in self.constants.device_properties.get(self.model, {}).get("Features", [])
+
+        if is_t2_mac:
+            ssdt_path = self.constants.acpi_path / "SSDT-T2-Fake.aml"
+            if ssdt_path.exists():
+                logging.warning(f"Conflicting SSDT-T2-Fake.aml detected for T2 Mac ({self.model}). Removing to prevent Kernel Panic.")
+                try:
+                    ssdt_path.unlink()
+                    logging.info(f"Successfully removed {ssdt_path.name}")
+                except Exception as e:
+                    logging.error(f"Failed to remove {ssdt_path.name}: {e}")
+            else:
+                logging.info(f"SSDT-T2-Fake.aml not found for T2 Mac ({self.model}), no action needed.")
+        else:
+            logging.info(f"Not a T2 Mac ({self.model}), skipping SSDT-T2-Fake.aml conflict check.")
     
     def _build_efi(self) -> None:
         """
@@ -80,13 +103,20 @@ class BuildOpenCore:
         support.BuildSupport(self.model, self.constants, self.config).enable_kext("Lilu.kext", self.constants.lilu_version, self.constants.lilu_path)
         self.config["Kernel"]["Quirks"]["DisableLinkeditJettison"] = True
 
+        # Intel UHD 630 VMM Stall Fix (2018-2020 Models)
+        _T2_UHD630_MODELS = ["MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "Macmini8,1", "iMac19,1", "iMac19,2", "iMac20,1", "iMac20,2"]
+        if self.model in _T2_UHD630_MODELS:
+            logging.info(f"- Disabling VMM CPUID for {self.model} to prevent UHD 630 driver stall")
+            self.constants.set_vmm_cpuid = False
+
         if "T2_CHIP" in self.constants.device_properties.get(self.model, {}).get("Features", []):
             try:
                 logging.info("- Importing t2smbiossecurity")
                 from ..efi_builder import t2smbiossecurity
                 try:
                     logging.info("- Add Booter Quirks patches for T2 Macs ")
-                    t2smbiossecurity.finalize_t2_tahoe_internal(self.config)
+                    # Updated to match function name in t2smbiossecurity.py
+                    t2smbiossecurity.finalize_t2_tahoe(self.constants.plist_path)
                 except Exception as e:
                     logging.error("Whoops, the function finalize_t2_tahoe_internal failed to run because of the following error:")
                     logging.exception("Stack Trace:") # This prints the full technical error

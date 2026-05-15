@@ -243,6 +243,79 @@ class BuildSecurity:
 
         logging.info("  > T2 memory descriptor overrides applied")
 
+    def _apply_t2_kernel_patches_tahoe(self) -> None:
+        """
+        Inject Kernel patches for macOS Tahoe (25.x/26.x) to resolve:
+        - USB/Mouse handshake stall
+        - IOBufferCopyController timeout panic
+        - AppleSEPManager SEPOS kernel panic
+        - AppleIntelUSBXHC Timeout (0x0A -> 0xFF)
+        """
+        if not self._is_t2_mac():
+            return
+
+        logging.info("- Injecting T2-specific Kernel patches for macOS Tahoe")
+
+        kernel_patches = self.config["Kernel"]["Patch"]
+
+        def patch_exists(comment: str) -> bool:
+            return any(p.get("Comment") == comment for p in kernel_patches)
+
+        # 1. Bypass AppleIntelUSBXHC T2 handshake
+        # Prevents USB/Mouse from freezing during early boot
+        if not patch_exists("Bypass T2 USB handshake (Tahoe fix)"):
+            kernel_patches.append({
+                "Arch": "x86_64",
+                "Comment": "Bypass T2 USB handshake (Tahoe fix)",
+                "Enabled": True,
+                "Identifier": "com.apple.driver.usb.AppleUSBXHCI",
+                "Find": binascii.unhexlify("488D3D00000000488B0500000000488B4028FFD0"),
+                "Replace": binascii.unhexlify("488D3D00000000488B0500000000488B40289090"),
+                "Mask": binascii.unhexlify("FFFFFFF0000000FFFFFFF0000000FFFFFFFFFF"),
+                "ReplaceMask": binascii.unhexlify("FFFFFFF0000000FFFFFFF0000000FFFFFFFFFF"),
+                "MinKernel": "25.0.0"
+            })
+
+        # 2. Increase AppleIntelUSBXHC Timeout (0x0A -> 0xFF)
+        # Resolves UI Stall on MacBookPro15,1 and other T2 Macs (Tahoe fix)
+        if not patch_exists("Increase T2 USB Timeout (UI Stall fix)"):
+            logging.info("  > Adding AppleIntelUSBXHC Timeout patch (0x0A -> 0xFF)")
+            kernel_patches.append({
+                "Arch": "x86_64",
+                "Comment": "Increase T2 USB Timeout (UI Stall fix)",
+                "Enabled": True,
+                "Identifier": "com.apple.driver.usb.AppleUSBXHCI",
+                "Find": binascii.unhexlify("BA0A000000"),
+                "Replace": binascii.unhexlify("BAFF000000"),
+                "MinKernel": "25.0.0"
+            })
+
+        # 3. Block com.apple.iokit.IOBufferCopyController
+        # Prevents IOBCC timeout panic
+        if not patch_exists("Block IOBufferCopyController (Tahoe fix)"):
+            kernel_patches.append({
+                "Arch": "x86_64",
+                "Comment": "Block IOBufferCopyController (Tahoe fix)",
+                "Enabled": True,
+                "Identifier": "com.apple.iokit.IOBufferCopyController",
+                "Find": binascii.unhexlify("554889E5"),
+                "Replace": binascii.unhexlify("31C0C390"),
+                "MinKernel": "25.0.0"
+            })
+
+        # 4. Patch AppleSEPManager to change panic to return
+        # Resolves SEPOS kernel panic during initialization
+        if not patch_exists("Patch AppleSEPManager panic to return (Tahoe fix)"):
+            kernel_patches.append({
+                "Arch": "x86_64",
+                "Comment": "Patch AppleSEPManager panic to return (Tahoe fix)",
+                "Enabled": True,
+                "Identifier": "com.apple.driver.AppleSEPManager",
+                "Find": binascii.unhexlify("4883BFB003000000754F"),
+                "Replace": binascii.unhexlify("C3909090909090909090"),
+                "MinKernel": "25.0.0"
+            })
+
     # ------------------------------------------------------------------
     # Main build entry point
     # ------------------------------------------------------------------
@@ -268,6 +341,7 @@ class BuildSecurity:
             # pass at the bottom) so the connector-less platform-id is in
             # place before Tahoe's APFS volume group init window closes.
             self._apply_t2_graphics_injection()
+            self._apply_t2_kernel_patches_tahoe()
 
         # ==============================================================
         # Branch B: Non-T2 Mac with SIP lowered
@@ -361,8 +435,11 @@ class BuildSecurity:
             # _update_nvram_string is idempotent via token-based dedup —
             # re-calling here is safe and acts as a final verification step.
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "amfi=0x80")
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "igfxonln=1")             # Force UHD 630 online to prevent UI stall
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "forceRenderStandby=0")    # Prevent GPU power saving UI hang
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "igfxfw=2")               # Force Apple Graphics Firmware
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "amfi_check_dyld_policy_at_eval=0")
-            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "ipc_control_port_options=0")
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "ipc_control_port_options=0") # Improve T2 communication stall fix
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-disable_sidecar_mac")
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "usbmuxd=0x3")
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "nvme_shutdown_timestamp=0")
