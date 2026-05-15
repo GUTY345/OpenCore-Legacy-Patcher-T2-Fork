@@ -11,23 +11,10 @@ Repo นี้จัดทำขึ้นเพื่อ **รวบรวมก
 
 **🔗 โปรเจกต์หลัก (Main Project):** สามารถติดตามและดาวน์โหลดเวอร์ชันต้นทางได้ที่: [albert-mueller/OpenCore-Legacy-Patcher-T2](https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2.git)
 
-#### **รายการที่แก้ไขเพิ่มเติมใน Repo นี้:**
-- [x] **UI/UX Fix:** แก้ไขปัญหาปุ่ม "Continue" เป็นสีเทา (กดไม่ได้) ในหน้า Installer ของ T2 Mac
-- [x] **Logic Fix:** ปรับปรุง `security.py` เพื่อแก้ปัญหาความปลอดภัยและอาการค้าง (Stall) ระหว่างบูต
-- [x] **Stability:** แก้ไขปัญหา `AttributeError` และ Bug อื่นๆ ที่ทำให้การ Build EFI ไม่สมบูรณ์
-
----
-
 ### **[EN] About This Repo**
 This repository is dedicated to **bug fixes and maintenance** for the T2-supported branch of OpenCore Legacy Patcher. It aims to resolve specific issues encountered during the development and installation of newer macOS versions on T2 Macs.
 
 **🔗 Main Project Link:** Please refer to the primary upstream repository for core updates: [albert-mueller/OpenCore-Legacy-Patcher-T2](https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2.git)
-
-#### **Key Fixes in this Branch:**
-- [x] **Installer UI Fix:** Resolved the "Grayed out Continue button" issue on T2 Macs during setup.
-- [x] **Security Logic:** Patched `security.py` to bypass boot hangs and improve ASP (Apple System Policy) compatibility.
-- [x] **Build Fixes:** Resolved `AttributeError` and script crashes during the EFI creation process.
-
 ---
 
 ## ⚠️ Disclaimer
