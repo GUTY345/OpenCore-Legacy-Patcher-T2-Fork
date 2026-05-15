@@ -30,8 +30,39 @@ This repository is dedicated to **bug fixes and maintenance** for the T2-support
 
 ---
 
+### **📋 รายการการแก้ไขเชิงลึก (Detailed Change Log)**
+
+#### **1. Graphics & UI Fixes (ระบบกราฟิกและอินเตอร์เฟซ)**
+* **Connector-less UHD630 Injection**: บังคับฉีด `ig-platform-id` เป็น `06009B3E` สำหรับ Intel UHD 630 เพื่อป้องกัน APFS race condition บน Tahoe ที่ทำให้ระบบค้าง
+* **Force GPU Online**: เพิ่ม Boot-arg `igfxonln=1` ป้องกันปัญหาปุ่มกดในหน้าติดตั้งไม่ตอบสนอง (UI Stall)
+* **GPU Power Management**: ตั้งค่า `forceRenderStandby=0` ปิดโหมดประหยัดพลังงาน GPU ระหว่างบูต
+* **Graphics Firmware**: บังคับใช้ Apple Graphics Firmware ด้วย `igfxfw=2` เพื่อเสถียรภาพสูงสุด
+
+#### **2. Kernel & Stability Patches (ความเสถียรของ Kernel)**
+* **SEP Manager Patch**: เปลี่ยน `panic` เป็น `return` ใน `AppleSEPManager` เพื่อแก้ปัญหาเครื่องรีสตาร์ทเอง
+* **IOBCC Block**: บล็อกไดรเวอร์ `IOBufferCopyController` ป้องกัน Kernel Panic "timed out" บน macOS Tahoe
+* **T2 Boot Overrides**: บังคับตั้งค่า `SecureBootModel = Disabled` และ `ApECID = 0` เพื่อการันตีการบูต
+
+#### **3. Storage & I/O Fixes (ระบบจัดเก็บข้อมูลและอุปกรณ์เชื่อมต่อ)**
+* **NVMe Mount Fix**: เพิ่ม `nvme_shutdown_timestamp=0` แก้ปัญหาการเมานท์พาร์ทิชัน APFS ค้าง (Stall)
+* **USB Timeout Extension**: ขยายเวลา `AppleIntelUSBXHC` Timeout เป็น 255ms (0xFF) ให้เมาส์/คีย์บอร์ดใช้งานได้ทันที
+* **USB Handshake Bypass**: แพตช์ข้ามขั้นตอน T2 USB handshake ป้องกันอุปกรณ์ค้างระหว่างเริ่มต้นระบบ
+* **APFS Stability**: ปิดการตรวจสอบ GPU ของ APFS และเปิด `keepsyms=1` เพื่อให้การ Replay Journal ทำงานสมบูรณ์
+
+---
+
+### **💻 รุ่นที่รองรับ (Supported Models)**
+* **MacBook Pro**: 15,1 / 15,3 / 16,1 / 16,4
+* **Mac mini**: 8,1
+* **MacBook Air**: 8,1 / 8,2 / 9,1
+* **Mac Pro**: 7,1
+
+---
+
 ## ⚠️ Disclaimer
 โปรเจกต์นี้เป็นการนำซอร์สโค้ดมาปรับปรุงเพื่อแก้ปัญหาเฉพาะหน้า (Experimental Bug Fixes) การใช้งานมีความเสี่ยง กรุณาสำรองข้อมูลสำคัญก่อนดำเนินการทุกครั้ง
+
+**หมายเหตุสำคัญ:** เพื่อให้แพตช์ทำงานสมบูรณ์บน Tahoe ต้องรันคำสั่ง `csrutil authenticated-root disable` ใน Recovery Mode
 
 ## Credits
 ขอขอบคุณผู้พัฒนาหลักและทีมงาน OCLP ทุกท่าน:
