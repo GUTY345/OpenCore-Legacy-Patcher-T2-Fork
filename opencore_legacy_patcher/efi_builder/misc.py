@@ -452,7 +452,14 @@ class BuildMiscellaneous:
         T2 Security Chip Handler
         T2 Macs shouldn't be patched with T1 patches because on T2 Macs, the T2 controlls the USB controller, while on T1 Macs, that's not the case.
         """
-        if self.model not in ["MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1", "Macmini8,1", "iMacPro1,1", "MacBookPro15,2", "MacBookPro15,1", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,3"]:
+        if self.model not in [
+            "MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1",
+            "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4",
+            "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4",
+            "Macmini8,1",
+            "iMac19,1", "iMac19,2", "iMac20,1", "iMac20,2",
+            "iMacPro1,1",
+        ]:
             return
 
         builder = support.BuildSupport(self.model, self.constants, self.config)
@@ -536,16 +543,15 @@ class BuildMiscellaneous:
                 logging.exception("Stack Trace:") # This prints the full technical error
                 logging.info("Aborting...")
                 sys.exit(3)
-            try:
-                logging.info("- Skipping Language and Region selection")
-                # Sets the language to English (Universal) and avoid the initial picker
-                self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["prev-lang:kbd"] = "en-US:0"
-            except Exception as e:
-                logging.error("Skipping language and region selection failed because of the following error:")
-                logging.exception("Stack Trace:") # This prints the full technical error
-                logging.info("Please try again later.")
-                logging.info(f"On your {self.model}, skipping the language selection is absolutely required to avoid Unsupported Mantissa speed kernel panics.")
-                sys.exit(3)
+
+        # Required for ALL T2 models — T2 USB controller is not ready when language picker appears
+        try:
+            logging.info("- Skipping Language and Region selection (all T2 models)")
+            self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["prev-lang:kbd"] = "en-US:0"
+        except Exception as e:
+            logging.error(f"Failed to set prev-lang:kbd: {e}")
+            logging.exception("Stack Trace:")
+            sys.exit(3)
 
         # T2 Support: Enable disk access (AMFI bypass), graphics fixes, and boot delay
         try:

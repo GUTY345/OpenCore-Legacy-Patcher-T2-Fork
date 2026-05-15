@@ -20,13 +20,16 @@ def finalize_t2_tahoe(path):
             config = plistlib.load(f)
 
         # 1. Booter Quirks (Stability for T2 + macOS 26)
-        if 'Booter' not in config: config['Booter'] = {'Quirks': {}}
-        if 'Quirks' not in config['Booter']: config['Booter']['Quirks'] = {}
-        
-        config['Booter']['Quirks']['RebuildAppleMemoryMap'] = True
-        config['Booter']['Quirks']['EnableWriteUnprotector'] = False
-        config['Booter']['Quirks']['SyncRuntimePermissions'] = True
-        config['Booter']['Quirks']['DevirtualiseMmio'] = True
+        if 'Booter' not in config:
+            config['Booter'] = {}
+        if 'Quirks' not in config['Booter']:
+            config['Booter']['Quirks'] = {}
+        config['Booter']['Quirks'].update({
+            'RebuildAppleMemoryMap': True,
+            'EnableWriteUnprotector': False,
+            'SyncRuntimePermissions': True,
+            'DevirtualiseMmio': True
+        })
 
         # 2. Kernel/Security Settings
         # UpdateSMBIOSMode: 'Custom' is required for many T2 patches to stick

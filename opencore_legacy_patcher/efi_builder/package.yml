@@ -1,0 +1,74 @@
+name: OCLP-Tahoe Packaging
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+
+jobs:
+  build-pkg:
+    name: Create macOS Installer
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Prepare Payload and Scripts
+        run: |
+          # 1. Establish the virtual directory structure
+          PAYLOAD_BIN="payload/usr/local/bin"
+          PAYLOAD_APP_SUPPORT="payload/Library/Application Support/OCLP-Tahoe"
+          
+          mkdir -p "$PAYLOAD_BIN"
+          mkdir -p "$PAYLOAD_APP_SUPPORT/uninstall"
+          
+          # 2. Copy source files into the Application Support payload
+          # We avoid copying the payload directory itself if it exists
+          find . -maxdepth 1 -not -path '*/.*' -not -name 'payload' -not -name '.' -exec cp -R {} "$PAYLOAD_APP_SUPPORT/" \;
+          
+          # 3. Create the global CLI command wrapper
+          cat << 'EOF' > "$PAYLOAD_BIN/oclp-tahoe"
+          #!/bin/bash
+          export PYTHONPATH="$PYTHONPATH:/Library/Application Support/OCLP-Tahoe"
+          python3 "/Library/Application Support/OCLP-Tahoe/opencore_legacy_patcher/efi_builder/build.py" "$@"
+          EOF
+          chmod +x "$PAYLOAD_BIN/oclp-tahoe"
+          
+          # 4. Create the automated Uninstall Script
+          cat << 'EOF' > "$PAYLOAD_APP_SUPPORT/uninstall/uninstall.sh"
+          #!/bin/bash
+          if [ "$EUID" -ne 0 ]; then
+            echo "Error: This script must be run with root privileges (sudo)."
+            exit 1
+          fi
+
+          echo "Removing OCLP-Tahoe CLI wrapper and source files..."
+          rm -f /usr/local/bin/oclp-tahoe
+          rm -rf "/Library/Application Support/OCLP-Tahoe"
+          echo "Uninstallation complete. T2 firmware and NVRAM modifications remain untouched."
+          EOF
+          chmod +x "$PAYLOAD_APP_SUPPORT/uninstall/uninstall.sh"
+
+          # 5. Extract standalone uninstaller for artifact export
+          cp "$PAYLOAD_APP_SUPPORT/uninstall/uninstall.sh" ./uninstall.sh
+
+      - name: Compile macOS Package
+        run: |
+          pkgbuild --root payload \
+                   --identifier com.mathachai.oclp.tahoe \
+                   --install-location / \
+                   OCLP-Tahoe-Installer.pkg
+
+      - name: Upload Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OCLP-Tahoe-Installation-Package
+          path: OCLP-Tahoe-Installer.pkg
+
+      - name: Upload Uninstaller Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OCLP-Tahoe-Uninstaller
+          path: uninstall.sh

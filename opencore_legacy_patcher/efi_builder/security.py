@@ -20,18 +20,27 @@ from ..datasets import (
 # ig-platform-id injection to avoid APFS volume group race condition
 # on macOS Tahoe and later. (Coffee Lake GT2)
 _T2_UHD630_MODELS = {
-    "MacBookPro15,1",  # 15-inch 2018
-    "MacBookPro15,3",  # 15-inch 2019 (Vega)
-    "MacBookPro16,1",  # 16-inch 2019
-    "MacBookPro16,4",  # 16-inch 2019 (CTO)
-    "Macmini8,1",      # Mac mini 2018
+    "MacBookPro15,1",  # 15-inch 2018 (UHD630 + Radeon)
+    "MacBookPro15,3",  # 15-inch 2019 (UHD630 + Radeon)
+    "MacBookPro16,1",  # 16-inch 2019 (UHD630 + Radeon)
+    "MacBookPro16,4",  # 16-inch 2019 CTO (UHD630 + Radeon)
+    "Macmini8,1",      # Mac mini 2018 (UHD630)
 }
 
-# T2 Mac models that use Intel UHD 617 and require graphics injection
-# for stability. (Amber Lake Y GT2)
+# T2 Mac models with Intel Iris Plus Graphics (U-Series)
+# Required for v1.0.6 logic isolation (iGPU-only).
+_T2_IRIS_PLUS_MODELS = {
+    "MacBookPro15,2",  # 13-inch 2018 (4 TB3)
+    "MacBookPro15,4",  # 13-inch 2019 (2 TB3)
+}
+
+# T2 Mac models that use Intel UHD 617 and require graphics injection for stability.
 _T2_UHD617_MODELS = {
     "MacBookAir8,1",   # Air 2018
     "MacBookAir8,2",   # Air 2019
+    "MacBookAir9,1",   # Air 2020 Intel
+    "MacBookPro16,2",  # 13-inch 2020 (4 TB3)
+    "MacBookPro16,3",  # 13-inch 2020 (2 TB3)
 }
 
 # T2 Mac models that do not have an Intel iGPU, or where iGPU injection
@@ -39,6 +48,10 @@ _T2_UHD617_MODELS = {
 _T2_NO_IGPU_MODELS = {
     "MacPro7,1",       # Mac Pro 2019
     "iMacPro1,1",      # iMac Pro 2017
+    "iMac19,1",        # iMac 27-inch 2019 (Radeon only, no iGPU injection needed)
+    "iMac19,2",        # iMac 21.5-inch 2019
+    "iMac20,1",        # iMac 27-inch 2020
+    "iMac20,2",        # iMac 27-inch 2020 CTO
 }
 
 
@@ -111,7 +124,7 @@ class BuildSecurity:
 
     def _requires_t2_graphics_injection(self) -> bool:
         """Return True if this T2 model needs Intel graphics injection."""
-        return (self.model in _T2_UHD630_MODELS or self.model in _T2_UHD617_MODELS)
+        return (self.model in _T2_UHD630_MODELS or self.model in _T2_UHD617_MODELS or self.model in _T2_IRIS_PLUS_MODELS)
 
     def _should_skip_t2_graphics_injection(self) -> bool:
         """Return True if this T2 model should explicitly skip Intel graphics injection."""
@@ -207,13 +220,20 @@ class BuildSecurity:
 
         gfx = self.config["DeviceProperties"]["Add"][graphics_path]
 
-        # Connector-less ig-platform-id for Coffee Lake GT2 (UHD 630)
-        # little-endian bytes: 06 00 9B 3E → platform 0x3E9B0006 (Connector-less fix for UI Stall)
-        gfx["AAPL,ig-platform-id"] = binascii.unhexlify("06009B3E")
-
-        # device-id: Intel UHD 630 Coffee Lake GT2, little-endian
-        logging.info("  > device-id = 9B 3E 00 00")
-        gfx["device-id"] = binascii.unhexlify("9B3E0000")
+        if self.model in _T2_IRIS_PLUS_MODELS:
+            # v1.0.6: Intel Iris Plus (Coffee Lake-U GT3)
+            # Using platform 0x3EA50009 (Connector-less) to fix Tahoe devfs stall.
+            # Little-endian: 09 00 A5 3E
+            logging.info("  > Injecting AAPL,ig-platform-id: 0900A53E (Iris Plus U-series)")
+            gfx["AAPL,ig-platform-id"] = binascii.unhexlify("0900A53E")
+            logging.info("  > device-id = A5 3E 00 00")
+            gfx["device-id"] = binascii.unhexlify("A53E0000")
+        else:
+            # Branch for Coffee Lake GT2 (UHD 630 / 15-inch / Mac mini)
+            # little-endian bytes: 06 00 9B 3E → platform 0x3E9B0006
+            gfx["AAPL,ig-platform-id"] = binascii.unhexlify("06009B3E")
+            logging.info("  > device-id = 9B 3E 00 00")
+            gfx["device-id"] = binascii.unhexlify("9B3E0000")
 
         # Required for any framebuffer-* patch keys to take effect
         logging.info("  > framebuffer-patch-enable = 1")
@@ -264,6 +284,10 @@ class BuildSecurity:
         # Legacy / Secondary boot-args
         self._update_nvram_string(apple_nvram_uuid, "boot-args", "-disable_sidecar_mac")
         self._update_nvram_string(apple_nvram_uuid, "boot-args", "amfi_check_dyld_policy_at_eval=0")
+        # Force bypass of the strict Cryptex security subsystem and runtime trust evaluations
+        self._update_nvram_string(apple_nvram_uuid, "boot-args", "cryptex=0")
+        self._update_nvram_string(apple_nvram_uuid, "boot-args", "amfi_allow_any_signature=1")
+        self._update_nvram_string(apple_nvram_uuid, "boot-args", "cs_allow_invalid=1")
         # resolving stall at dev_init:303 on macOS Tahoe (T2 ONLY)
         self._update_nvram_string(apple_nvram_uuid, "boot-args", "nvme_shutdown_timestamp=0")
         self._update_nvram_string(apple_nvram_uuid, "boot-args", "keepsyms=1")
@@ -274,9 +298,7 @@ class BuildSecurity:
         """
         Inject Kernel patches for macOS Tahoe (25.x/26.x) to resolve:
         - USB/Mouse handshake stall
-        - IOBufferCopyController timeout panic
         - AppleSEPManager SEPOS kernel panic
-        - AppleGFX Conflict (dGPU Disable)
         - AppleIntelUSBXHC Timeout (0x0A -> 0xFF)
         """
         if not self._is_t2_mac():
@@ -299,8 +321,8 @@ class BuildSecurity:
                 "Identifier": "com.apple.driver.usb.AppleUSBXHCI",
                 "Find": binascii.unhexlify("488D3D00000000488B0500000000488B4028FFD0"),
                 "Replace": binascii.unhexlify("488D3D00000000488B0500000000488B40289090"),
-                "Mask": binascii.unhexlify("FFFFFFF0000000FFFFFFF0000000FFFFFFFFFF"),
-                "ReplaceMask": binascii.unhexlify("FFFFFFF0000000FFFFFFF0000000FFFFFFFFFF"),
+                "Mask": binascii.unhexlify("FFFFFFF0000000FFFFFFF0000000FFFFFFFFFFFF"),
+                "ReplaceMask": binascii.unhexlify("FFFFFFF0000000FFFFFFF0000000FFFFFFFFFFFF"),
                 "MinKernel": "25.0.0"
             })
 
@@ -318,34 +340,7 @@ class BuildSecurity:
                 "MinKernel": "25.0.0"                          # Matches Tahoe Kernel
             })
 
-        # 3. Block com.apple.iokit.IOBufferCopyController
-        # Prevents IOBCC timeout panic
-        if not patch_exists("Block IOBufferCopyController (Tahoe fix)"):
-            kernel_patches.append({
-                "Arch": "x86_64",
-                "Comment": "Block IOBufferCopyController (Tahoe fix)",
-                "Enabled": True,
-                "Identifier": "com.apple.iokit.IOBufferCopyController",
-                "Find": binascii.unhexlify("554889E5"),
-                "Replace": binascii.unhexlify("31C0C390"),
-                "MinKernel": "25.0.0"
-            })
-
-        # 4. Disable AppleGFX to prevent dGPU conflict during boot
-        # Specific to MacBookPro15,1/16,1 hybrid graphics models
-        if not patch_exists("Disable AppleGFX dGPU (Tahoe fix)"):
-            logging.info("  > Adding AppleGFX disable patch")
-            kernel_patches.append({
-                "Arch": "x86_64",
-                "Comment": "Disable AppleGFX dGPU (Tahoe fix)",
-                "Enabled": True,
-                "Identifier": "com.apple.driver.AppleGFX",
-                "Find": binascii.unhexlify("554889E5"),
-                "Replace": binascii.unhexlify("31C0C390"),
-                "MinKernel": "25.0.0"
-            })
-
-        # 5. Patch AppleSEPManager to change panic to return
+        # 3. Patch AppleSEPManager to change panic to return
         # Resolves SEPOS kernel panic during initialization
         if not patch_exists("Patch AppleSEPManager panic to return (Tahoe fix)"):
             kernel_patches.append({
@@ -358,7 +353,7 @@ class BuildSecurity:
                 "MinKernel": "25.0.0"                                 # Target macOS 26 (Tahoe)
             })
 
-        # 6. Bypass InternalHubPowerCheck in AppleIntelUSBXHC
+        # 4. Bypass InternalHubPowerCheck in AppleIntelUSBXHC
         # ป้องกันระบบค้างรอสถานะการจ่ายไฟของ USB Hub บนชิป T2
         if not patch_exists("Bypass InternalHubPowerCheck (Tahoe fix)"):
             logging.info("  > Adding InternalHubPowerCheck bypass patch")
@@ -381,7 +376,7 @@ class BuildSecurity:
                 "Enabled": True,
                 "Identifier": "com.apple.driver.AppleTouchBarHIDEventDriver",
                 "Find": binascii.unhexlify("4883C4085B415C415D415E415F5DC3"),
-                "Replace": binascii.unhexlify("31C04883C4085B415C415D415E415F5DC3"),
+                "Replace": binascii.unhexlify("31C090905B415C415D415E415F5DC3"),
                 "MinKernel": "25.0.0"
             })
 
@@ -509,11 +504,20 @@ class BuildSecurity:
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "agdpmod=vit9696")         # Disable board ID checks
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "igfxfw=2")               # Force Apple Graphics Firmware
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "amfi_check_dyld_policy_at_eval=0")
+            # Force bypass of the strict Cryptex security subsystem and runtime trust evaluations
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "cryptex=0")
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "amfi_allow_any_signature=1")
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "cs_allow_invalid=1")
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "ipc_control_port_options=0") # Improve T2 communication stall fix
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-disable_sidecar_mac")
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "usbmuxd=0x3")
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "nvme_shutdown_timestamp=0")
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "keepsyms=1")
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "apfs_nvidia_restrict=0")
+
+            # Force APFS to bypass broken snapshot chains and relax root DMG trust signatures
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "apfs_read_only_nodownloads=1")
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "root_dmg_trust_level=0")
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-rootdmgboot")
 
             logging.info("  > T2 final overrides complete — ready for boot")
