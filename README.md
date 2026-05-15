@@ -51,6 +51,30 @@ This repository is dedicated to **bug fixes and maintenance** for the T2-support
 
 ---
 
+## Detailed Change Log
+
+### 1. Graphics & UI Fixes
+
+* **Connector-less UHD630 Injection:** Forced `ig-platform-id = 06009B3E` injection for Intel UHD 630 to prevent the APFS race condition on Tahoe that causes system freezes.
+* **Force GPU Online:** Added the boot argument `igfxonln=1` to prevent installer UI stalls and unresponsive buttons during setup.
+* **GPU Power Management:** Set `forceRenderStandby=0` to disable GPU power-saving mode during boot.
+* **Graphics Firmware:** Forced Apple Graphics Firmware loading with `igfxfw=2` for maximum stability.
+
+### 2. Kernel & Stability Patches
+
+* **SEP Manager Patch:** Replaced kernel panic behavior with a return routine in `AppleSEPManager` to prevent unexpected system reboots.
+* **IOBCC Block:** Blocked the `IOBufferCopyController` driver to avoid `"timed out"` Kernel Panic issues on macOS Tahoe.
+* **T2 Boot Overrides:** Forced `SecureBootModel = Disabled` and `ApECID = 0` to ensure reliable boot compatibility.
+
+### 3. Storage & I/O Fixes
+
+* **NVMe Mount Fix:** Added `nvme_shutdown_timestamp=0` to resolve APFS partition mount stalls during boot.
+* **USB Timeout Extension:** Extended `AppleIntelUSBXHC` timeout to `255ms (0xFF)` so the mouse and keyboard become responsive immediately after boot.
+* **USB Handshake Bypass:** Patched and bypassed the T2 USB handshake process to prevent USB devices from freezing during system startup.
+* **APFS Stability:** Disabled APFS GPU verification and enabled `keepsyms=1` to ensure proper APFS journal replay functionality.
+
+---
+
 ### **💻 รุ่นที่รองรับ (Supported Models)**
 * **MacBook Pro**: 15,1 / 15,3 / 16,1 / 16,4
 * **Mac mini**: 8,1
