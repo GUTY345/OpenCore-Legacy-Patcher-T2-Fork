@@ -67,7 +67,7 @@ class MainFrame(wx.Frame):
         logo.Centre(wx.HORIZONTAL)
 
         # Title label
-        title_label = wx.StaticText(self, label=f"OpenCore Legacy Patcher for T2 Macs Insider Preview", pos=(-1, 128))
+        title_label = wx.StaticText(self, label=f"OCLP-T2 Patcher Beta FixBugs", pos=(-1, 128))
         title_label.SetFont(gui_support.font_factory(25, wx.FONTWEIGHT_BOLD))
         title_label.Centre(wx.HORIZONTAL)
 
