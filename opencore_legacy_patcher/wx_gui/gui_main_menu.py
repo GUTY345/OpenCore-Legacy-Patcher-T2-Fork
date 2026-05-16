@@ -94,7 +94,7 @@ class MainFrame(wx.Frame):
                 "description": ["Download and flash a macOS", "Installer for your system."],
                 "icon": str(self.constants.icns_resource_path / "OC-Installer.icns"),
             },
-            "Post-Install Root Patch": {
+            "Install drivers and root patches": {
                 "function": self.on_post_install_root_patch,
                 "description": ["Installs hardware drivers and", "patches for your system after", "installing a new version of macOS."],
                 "icon": str(self.constants.icns_resource_path / "OC-Patch.icns"),
