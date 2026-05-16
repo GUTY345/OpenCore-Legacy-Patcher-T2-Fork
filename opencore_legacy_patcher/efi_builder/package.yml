@@ -4,8 +4,14 @@ on:
   push:
     branches:
       - main
+      - master
     tags:
-      - '*'
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
 
 jobs:
   build-pkg:
