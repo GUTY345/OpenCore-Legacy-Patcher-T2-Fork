@@ -1,4 +1,11 @@
 # OpenCore Legacy Patcher T2 changelog / OpenCore Legacy Patcher T2-Änderungslog
+## 4.0.0 alpha 14:
+
+
+## 4.0.0 alpha 11-13:
+Diese Versionen sind nur Sicherheitsupdates und Fehlerehebungen.
+These versions are security and bugfix updates.
+
 ## 4.0.0 alpha 10:
 This release:
 
@@ -415,7 +422,7 @@ The issues https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/8
 
 Reminder: before to boot into OpenCore on T2 Macs, don't forget to hold command + R until macOS Recovery loads. Then go to Utilities > Terminal. Then, type the following commands:
 csrutil disable
-csrutil-authenticated boot disable
+csrutil-authenticated root disable
 And then go to Apple Logo > Restart. Then you can boot into OpenCore and boot into macOS's installer.
 
 ## 3.1.0 alpha 2:
