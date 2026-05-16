@@ -96,7 +96,8 @@ class MainFrame(wx.Frame):
             },
             "Install drivers and patches": {
                 "function": self.on_post_install_root_patch,
-                "description": ["Installs hardware drivers and", "patches for your system after", "installing a new version of macOS." /n/n,"This is the Install Root Patch button."],
+                "description": ["Installs hardware drivers and", "patches for your system after", "installing a new version of macOS."],
+                "description": ["This is the equivalent of the Install Root Patch button."],
                 "icon": str(self.constants.icns_resource_path / "OC-Patch.icns"),
             },
             "Support": {
