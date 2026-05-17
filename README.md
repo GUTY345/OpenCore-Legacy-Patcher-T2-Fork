@@ -60,7 +60,7 @@
 | iMac20,1 | iMac 27-inch 2020 |
 | iMac20,2 | iMac 27-inch 2020 CTO |
 
-> ✨ = รองรับเต็มรูปแบบใหม่ใน v1.0.7.1 / Newly added full support in v1.0.7.1
+> ✨ = รองรับเต็มรูปแบบใหม่ใน v1.0.7 / Newly added full support in v1.0.7
 
 ---
 
@@ -90,7 +90,7 @@
 
 ### 🟡 Graphics Fixes / แก้ไขปัญหากราฟิก
 
-**Intel UHD 617 — MacBook Air 2018/2019 (ใหม่ใน v1.0.7.1)**
+**Intel UHD 617 — MacBook Air 2018/2019 (ใหม่ใน v1.0.7)**
 
 **[EN]**
 - Correct connector-less `ig-platform-id 0x3EA50009` (Amber Lake GT3e) now injected
