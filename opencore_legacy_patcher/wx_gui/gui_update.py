@@ -203,6 +203,7 @@ class UpdateFrame(wx.Frame):
         )
         if result.returncode != 0:
             logging.error(f"Failed to extract update.")
+            logging.exception("Stack Trace:")
             subprocess_wrapper.log(result)
             wx.CallAfter(self.progress_bar_animation.stop_pulse)
             wx.CallAfter(self.progress_bar.SetValue, 0)
@@ -223,16 +224,16 @@ class UpdateFrame(wx.Frame):
                 logging.info("User cancelled update")
                 wx.CallAfter(wx.MessageBox, "User cancelled update", "Update Cancelled", wx.OK | wx.ICON_INFORMATION)
             else:
-                logging.critical("Failed to install update.")
+                logging.critical("The app failed to update via the builtin updater. The error is the following:")
                 logging.exception("Stack Trace:")
-                logging.info("Try to update later.")
+                logging.info("We'll try our best to fix the issue for you. If we can't, it will automatically fall back to in place upgrade.")
                 subprocess_wrapper.log(result)
 
                 # If it fails, fall back to opening the PKG
-                logging.error("Failed to install update, attempting to open PKG")
+                logging.error("Failed to install update via the builtin updater, switching to in-place upgrade instead...")
                 subprocess.run(["/usr/bin/open", str(self.pkg_download_path)])
 
-                wx.CallAfter(wx.MessageBox, f"Failed to install update. Please try installing the OpenCore-Patcher.pkg manually or download from GitHub", "Critical Error!", wx.OK | wx.ICON_ERROR)
+                wx.CallAfter(wx.MessageBox, f"Failed to install update. Please, go to https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/tree/main, go to releases /n/n and download a fresh pkg file and perform inplace upgrade, just as if you were to install a fresh copy.", "Critical Error!", wx.OK | wx.ICON_ERROR)
             wx.CallAfter(sys.exit, 1)
 
 
