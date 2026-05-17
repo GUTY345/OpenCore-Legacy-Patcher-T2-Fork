@@ -146,13 +146,15 @@ class BuildOpenCore:
                 sys.exit(3)
 
         # macOS Sequoia/Tahoe support for Lilu plugins
-        # NOTE: -lilubetaall causes corecrypto FIPS POST panic on T2 Macs (Tahoe/macOS 26)
-        # because it forces Lilu injection into com.apple.kec.corecrypto.
-        # Use -liluforce instead, which only injects into kexts that Lilu plugins explicitly target.
-        lilu_arg = "-liluforce" if self.model in model_array.T2Macs else "-lilubetaall"
-        current_boot_args = self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"]
-        if lilu_arg not in current_boot_args:
-            self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += f" {lilu_arg}"
+        # NOTE: T2 Macs must NOT use any -lilu* flag.
+        # -lilubetaall and -liluforce both cause Lilu to inject into
+        # com.apple.kec.corecrypto, which breaks the FIPS POST self-test
+        # and causes a kernel panic at _corecrypto_kext_start on Tahoe.
+        # T2 boot relies on AMFIPass + -amfipassbeta instead.
+        if self.model not in model_array.T2Macs:
+            current_boot_args = self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"]
+            if "-lilubetaall" not in current_boot_args:
+                self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " -lilubetaall"
 
         # Call support functions
         for function in [
