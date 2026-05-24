@@ -1,5 +1,5 @@
 """
-security.py: Class for handling macOS Security Patches, invocation from build.py
+_security_2.py: Class for handling macOS Security Patches, invocation from build.py
 """
 
 import logging
