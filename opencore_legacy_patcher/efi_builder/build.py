@@ -105,7 +105,7 @@ class BuildOpenCore:
         self.config["Kernel"]["Quirks"]["DisableLinkeditJettison"] = True
 
         # Intel UHD 630 VMM Stall Fix (2018-2020 Models)
-        _T2_UHD630_MODELS = ["MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "Macmini8,1", "iMac19,1", "iMac19,2", "iMac20,1", "iMac20,2"]
+        _T2_UHD630_MODELS = ["MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,3", "MacBookPro16,4", "Macmini8,1", "iMac19,1", "iMac19,2", "iMac20,1", "iMac20,2"]
         if self.model in _T2_UHD630_MODELS:
             logging.info(f"- Disabling VMM CPUID for {self.model} to prevent UHD 630 driver stall")
             self.constants.set_vmm_cpuid = False
