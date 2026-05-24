@@ -1,0 +1,106 @@
+name: Rebuild Release Assets
+
+# Manually trigger to rebuild .pkg files for an existing release tag
+# Usage: Actions tab → "Rebuild Release Assets" → Run workflow → enter tag name
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to rebuild (e.g. v1.0.7)'
+        required: true
+        type: string
+
+# Only allow one rebuild job at a time — prevents macOS runner queue stacking
+concurrency:
+  group: rebuild-release
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    name: Rebuild PKGs for ${{ github.event.inputs.tag }}
+    runs-on: macos-13
+    timeout-minutes: 150
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Install Universal Python 3.13
+        run: |
+          curl -fsSL -o python-installer.pkg https://www.python.org/ftp/python/3.13.3/python-3.13.3-macos11.pkg
+          sudo installer -pkg python-installer.pkg -target /
+          echo "/Library/Frameworks/Python.framework/Versions/3.13/bin" >> $GITHUB_PATH
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Dependencies
+        run: /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m pip install -r requirements.txt
+
+      - name: Force Universal2 charset for Python
+        run: |
+          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m pip uninstall -y charset_normalizer || true
+          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m pip download --platform macosx_10_9_universal2 --only-binary=:all: --dest ./charset_tmp charset-normalizer
+          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m pip install ./charset_tmp/charset_normalizer-*.whl
+          rm -rf ./charset_tmp
+
+      - name: Recompile Privileged Helper (debug)
+        run: make -C ci_tooling/privileged_helper_tool debug
+
+      - name: Prepare Assets
+        run: >
+          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 Build-Project.command
+          --run-as-individual-steps --reset-dmg-cache
+          --prepare-assets
+        timeout-minutes: 60
+
+      - name: Verify Assets
+        run: |
+          ls -lh ./payloads.dmg || (echo "ERROR: payloads.dmg not found" && exit 1)
+          ls -lh ./Universal-Binaries.dmg || (echo "ERROR: Universal-Binaries.dmg not found" && exit 1)
+
+      - name: Prepare Application
+        run: >
+          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 Build-Project.command
+          --git-branch "refs/tags/${{ github.event.inputs.tag }}"
+          --reset-pyinstaller-cache
+          --run-as-individual-steps
+          --prepare-application
+        timeout-minutes: 60
+
+      - name: Verify Application
+        run: |
+          ls -lh ./dist/OpenCore-Patcher.app || (echo "ERROR: OpenCore-Patcher.app not found" && exit 1)
+
+      - name: Prepare Package
+        run: >
+          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 Build-Project.command
+          --run-as-individual-steps
+          --prepare-package
+        timeout-minutes: 30
+
+      - name: Verify Packages
+        run: |
+          ls -lh ./dist/AutoPkg-Assets.pkg || (echo "ERROR: AutoPkg-Assets.pkg not found" && exit 1)
+          ls -lh ./dist/OpenCore-Patcher.pkg || (echo "ERROR: OpenCore-Patcher.pkg not found" && exit 1)
+          ls -lh ./dist/OpenCore-Patcher-Uninstaller.pkg || (echo "ERROR: OpenCore-Patcher-Uninstaller.pkg not found" && exit 1)
+          echo "All packages built successfully"
+
+      - name: Upload to existing Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          files: |
+            ./dist/AutoPkg-Assets.pkg
+            ./dist/OpenCore-Patcher.pkg
+            ./dist/OpenCore-Patcher-Uninstaller.pkg

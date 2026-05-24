@@ -1,0 +1,158 @@
+name: CI - Build wxPython
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+    paths-ignore:
+      - 'docs/**'
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Build wxPython
+    runs-on: macos-13
+    timeout-minutes: 120
+    permissions:
+      contents: write
+
+    # Only one build at a time — prevents macOS runner queue stacking on free tier
+    concurrency:
+      group: build-wxpython-${{ github.ref }}
+      cancel-in-progress: true
+
+    env:
+      branch: ${{ github.ref }}
+      commiturl: ${{ github.event.head_commit.url }}${{ github.event.release.html_url }}
+      commitdate: ${{ github.event.head_commit.timestamp }}${{ github.event.release.published_at }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Universal Python 3.13
+        run: |
+          curl -fsSL -o python-installer.pkg https://www.python.org/ftp/python/3.13.3/python-3.13.3-macos11.pkg
+          sudo installer -pkg python-installer.pkg -target /
+          echo "/Library/Frameworks/Python.framework/Versions/3.13/bin" >> $GITHUB_PATH
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Dependencies
+        run: /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m pip install -r requirements.txt
+
+      - name: Force Universal2 charset for Python
+        run: |
+          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m pip uninstall -y charset_normalizer || true
+          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m pip download --platform macosx_10_9_universal2 --only-binary=:all: --dest ./charset_tmp charset-normalizer
+          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m pip install ./charset_tmp/charset_normalizer-*.whl
+          rm -rf ./charset_tmp
+
+      - name: Recompile Privileged Helper (debug, no team ID check)
+        run: make -C ci_tooling/privileged_helper_tool debug
+
+      - name: Prepare Assets (--prepare-assets)
+        run: >
+          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 Build-Project.command
+          --run-as-individual-steps --reset-dmg-cache
+          --prepare-assets
+        timeout-minutes: 60
+
+      - name: Verify Assets exist
+        run: |
+          echo "Checking payloads.dmg..."
+          ls -lh ./payloads.dmg || (echo "ERROR: payloads.dmg not found" && exit 1)
+          echo "Checking Universal-Binaries.dmg..."
+          ls -lh ./Universal-Binaries.dmg || (echo "ERROR: Universal-Binaries.dmg not found" && exit 1)
+
+      - name: Prepare Application (--prepare-application)
+        run: >
+          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 Build-Project.command
+          --git-branch "${{ env.branch }}"
+          --git-commit-url "${{ env.commiturl }}"
+          --git-commit-date "${{ env.commitdate }}"
+          --reset-pyinstaller-cache
+          --run-as-individual-steps
+          --prepare-application
+        timeout-minutes: 60
+
+      - name: Verify Application exists
+        run: |
+          echo "Checking OpenCore-Patcher.app..."
+          ls -lh ./dist/OpenCore-Patcher.app || (echo "ERROR: OpenCore-Patcher.app not found" && exit 1)
+
+      - name: Prepare Package (--prepare-package)
+        run: >
+          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 Build-Project.command
+          --run-as-individual-steps
+          --prepare-package
+        timeout-minutes: 30
+
+      - name: Verify Packages exist
+        run: |
+          echo "Checking packages..."
+          ls -lh ./dist/AutoPkg-Assets.pkg || (echo "ERROR: AutoPkg-Assets.pkg not found" && exit 1)
+          ls -lh ./dist/OpenCore-Patcher.pkg || (echo "ERROR: OpenCore-Patcher.pkg not found" && exit 1)
+          ls -lh ./dist/OpenCore-Patcher-Uninstaller.pkg || (echo "ERROR: OpenCore-Patcher-Uninstaller.pkg not found" && exit 1)
+          echo "All packages verified successfully"
+
+      - name: Upload AutoPkg Package to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoPkg-Assets.pkg
+          path: ./dist/AutoPkg-Assets.pkg
+
+      - name: Upload Installation Package to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenCore-Patcher.pkg
+          path: ./dist/OpenCore-Patcher.pkg
+
+      - name: Upload Uninstaller Package to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenCore-Patcher-Uninstaller.pkg
+          path: ./dist/OpenCore-Patcher-Uninstaller.pkg
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./dist/AutoPkg-Assets.pkg
+            ./dist/OpenCore-Patcher.pkg
+            ./dist/OpenCore-Patcher-Uninstaller.pkg
+          generate_release_notes: false
+          body: |
+            ## OpenCore Legacy Patcher for T2 Macs — ${{ github.ref_name }}
+
+            ### 🐛 Bug Fixes
+            - **Fixed `com.apple.kec.corecrypto` kernel panic on macOS Tahoe** — removed `-liluforce` / `-lilubetaall` from T2 Mac boot-args. Lilu injection into `corecrypto` breaks the FIPS POST self-test causing a panic at `_corecrypto_kext_start`. T2 Macs now use AMFIPass + `-amfipassbeta` exclusively.
+            - **Added corecrypto FIPS POST bypass kernel patch** — patches `TEST EAX,EAX / JE panic` → `NOP NOP` in `com.apple.kec.corecrypto` (MinKernel 25.0.0) so boot continues when OpenCore's unsigned boot path cannot satisfy T2 firmware trust.
+            - **Fixed duplicate kernel patches** — `AppleSEPManager` timeout panic patch was being injected twice (once from `security.py`, once from `misc.py`). Added deduplication guard.
+            - **Fixed `run_sequence()` dead code in `misc.py`** — removed subprocess calls to `misc.py` and `t2smbiossecurity.py` that had no effect and caused `finalize_t2_tahoe` to run twice.
+            - **Fixed WhateverGreen / CryptexFixup / AMFIPass duplicate injection** — added `get_kext_by_bundle_path` guard before each `enable_kext` call in `_t2_handling`.
+
+            ### ✨ New Features
+            - **Intel UHD 617 support for MacBook Air 2018/2019** — MacBookAir8,1 / 8,2 / 9,1 and MacBookPro16,2 / 16,3 now receive the correct connector-less `ig-platform-id 0x3EA50009` (Amber Lake GT3e). Previously these models incorrectly received UHD 630 IDs (`0x3E9B0006`) causing a grey screen at boot on macOS Tahoe.
+            - **UHD 617 grey screen fix** — added `igfxgl=1` and `igfxmetal=1` boot-args for UHD 617 models to force OpenGL renderer and enable Metal on connector-less platform.
+            - **`igfxnoredir=1` scoped to UHD 630 only** — this arg was incorrectly applied to all T2 Macs including UHD 617 models where it causes display issues.
+            - **Security chip detection in main menu** — header now shows the detected security chip:
+              - `Chip: Apple T2 Security Chip` (cyan) — for all T2 Mac models
+              - `Chip: Apple T1 Security Chip` (green) — detected via USB device probe
+              - `Chip: No T1 / T2 Security Chip` (grey) — for older Macs
+
+            ### 📋 Supported Models (T2 Macs)
+            MacBookPro15,1 · MacBookPro15,2 · MacBookPro15,3 · MacBookPro15,4
+            MacBookPro16,1 · MacBookPro16,2 · MacBookPro16,3 · MacBookPro16,4
+            MacBookAir8,1 · MacBookAir8,2 · MacBookAir9,1
+            Macmini8,1 · MacPro7,1 · iMac19,1 · iMac19,2 · iMac20,1 · iMac20,2
