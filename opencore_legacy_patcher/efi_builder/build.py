@@ -74,20 +74,6 @@ class BuildOpenCore:
         # This relies on constants.device_properties being populated, which happens
         # during the defaults generation phase.
         is_t2_mac = self.model in model_array.T2Macs or "T2_CHIP" in self.constants.device_properties.get(self.model, {}).get("Features", [])
-
-        if is_t2_mac:
-            ssdt_path = self.constants.acpi_path / "SSDT-T2-Fake.aml"
-            if ssdt_path.exists():
-                logging.warning(f"Conflicting SSDT-T2-Fake.aml detected for T2 Mac ({self.model}). Removing to prevent Kernel Panic.")
-                try:
-                    ssdt_path.unlink()
-                    logging.info(f"Successfully removed {ssdt_path.name}")
-                except Exception as e:
-                    logging.error(f"Failed to remove {ssdt_path.name}: {e}")
-            else:
-                logging.info(f"SSDT-T2-Fake.aml not found for T2 Mac ({self.model}), no action needed.")
-        else:
-            logging.info(f"Not a T2 Mac ({self.model}), skipping SSDT-T2-Fake.aml conflict check.")
     
     def _build_efi(self) -> None:
         """
