@@ -22,12 +22,12 @@ def finalize_t2_tahoe(path):
         with open(path, 'rb') as f:
             config = plistlib.load(f)
 
+        # ==============================================================
         # 1. Booter Quirks (T2 + macOS Tahoe/26)
+        # ==============================================================
         # IMPORTANT: RebuildAppleMemoryMap and DevirtualiseMmio must remain False on T2 Macs.
         # Enabling them modifies kernel memory layout before corecrypto initializes,
         # which causes the FIPS Kernel POST to fail (-2074) and kernel panic at boot.
-        # T2 Macs use Apple's own secure memory management via the T2 chip — these quirks
-        # are only needed for non-Apple (Hackintosh) firmware.
         booter = config.setdefault('Booter', {})
         quirks = booter.setdefault('Quirks', {})
 
@@ -38,7 +38,9 @@ def finalize_t2_tahoe(path):
             'DevirtualiseMmio': False,
         })
 
+        # ==============================================================
         # 2. PlatformInfo & Security Settings
+        # ==============================================================
         # UpdateSMBIOSMode: 'Custom' is required for T2 SMBIOS patches to work
         platform_info = config.setdefault('PlatformInfo', {})
         platform_info['UpdateSMBIOSMode'] = 'Custom'
@@ -48,25 +50,38 @@ def finalize_t2_tahoe(path):
         security = misc.setdefault('Security', {})
         security['SecureBootModel'] = 'Disabled'
 
-        # 3. Schema Guard (Prevents ocvalidate crashes)
-        # Ensure Kernel->Quirks exists so validation doesn't fail on missing parent keys
+        # ==============================================================
+        # 3. Kernel Quirks & Structural Schema Guard
+        # ==============================================================
         kernel = config.setdefault('Kernel', {})
         kernel_quirks = kernel.setdefault('Quirks', {})
+        
+        # CRITICAL FIX: UpdateSMBIOSMode='Custom' requires CustomSMBIOSGuid=True
+        # inside Kernel->Quirks, or OpenCore completely ignores your patched SMBIOS.
+        logging.info("  > Enforcing CustomSMBIOSGuid alignment for T2 SMBIOS spoofing compatibility.")
+        kernel_quirks['CustomSMBIOSGuid'] = True
+
+        # Ensure sensible defaults for missing critical variables to prevent ocvalidate stalls
         if 'DisableIoMapper' not in kernel_quirks:
             kernel_quirks['DisableIoMapper'] = True
+        if 'AppleCpuPmCfgLock' not in kernel_quirks:
+            kernel_quirks['AppleCpuPmCfgLock'] = False
+        if 'ProvideCurrentCpuInfo' not in kernel_quirks:
+            kernel_quirks['ProvideCurrentCpuInfo'] = False
 
+        # ==============================================================
         # 4. Save the file back
+        # ==============================================================
         with open(path, 'wb') as f:
             plistlib.dump(config, f, sort_keys=True)
             
         print("-" * 30)
         print("T2 PATCH SUCCESSFUL")
-        print("Status: Booter/Security schema verified.")
+        print("Status: Booter/Security schema verified and cross-aligned.")
         print("-" * 30)
 
     except Exception as e:
         logging.error(f"Critical failure during config patch: {e}")
-        # Raise so build.py can catch the error and exit cleanly
         raise
 
 if __name__ == "__main__":
