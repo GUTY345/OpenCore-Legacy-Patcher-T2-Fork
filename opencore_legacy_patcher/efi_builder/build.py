@@ -96,51 +96,69 @@ class BuildOpenCore:
             logging.info(f"- Disabling VMM CPUID for {self.model} to prevent UHD 630 driver stall")
             self.constants.set_vmm_cpuid = False
 
-        if self.model in model_array.T2Macs or "T2_CHIP" in self.constants.device_properties.get(self.model, {}).get("Features", []):
+        # Determine T2 status upfront
+        is_t2 = self.model in model_array.T2Macs or "T2_CHIP" in self.constants.device_properties.get(self.model, {}).get("Features", [])
+
+        if is_t2:
             try:
                 logging.info("- Importing t2smbiossecurity")
                 from ..efi_builder import t2smbiossecurity
                 try:
                     logging.info("- Add Booter Quirks patches for T2 Macs ")
-                    # Updated to match function name in t2smbiossecurity.py
                     t2smbiossecurity.finalize_t2_tahoe(self.constants.plist_path)
                 except Exception as e:
-                    logging.error("Whoops, the function finalize_t2_tahoe_internal failed to run because of the following error:")
-                    logging.exception("Stack Trace:") # This prints the full technical error
+                    logging.error("Whoops, the function finalize_t2_tahoe failed to run because of the following error:")
+                    logging.exception("Stack Trace:")
                     logging.info("Please try again later.")
                     sys.exit(3)
 
                 logging.info("- Adding T2-specific bypass NVRAM variables")
-            
-                # Append T2-specific boot args to the existing boot-args string
-                t2_args = " -ibtcompatbeta -amfipassbeta"
+                
                 if "NVRAM" not in self.config:
-                    self.config["NVRAM"] = {"Add": {}}
-                    if "7C436110-AB2A-4BBB-A880-FE41995C9F82" not in self.config["NVRAM"]["Add"]:
-                        self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"] = {"boot-args": ""}
+                    self.config["NVRAM"] = {"Add": {}, "Delete": {}}
+                if "Delete" not in self.config["NVRAM"]:
+                    self.config["NVRAM"]["Delete"] = {}
 
-                # Now safely append
-                current_args = self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].get("boot-args", "")
-                self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = current_args + t2_args
-            
-                # Ensure DisableIoMapper is True
+                if "7C436110-AB2A-4BBB-A880-FE41995C9F82" not in self.config["NVRAM"]["Add"]:
+                    self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"] = {"boot-args": ""}
+
+                # Ensure we strictly clean out legacy variables from NVRAM to prevent corecrypto mismatch
+                if "7C436110-AB2A-4BBB-A880-FE41995C9F82" not in self.config["NVRAM"]["Delete"]:
+                    self.config["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"] = []
+                
+                for target_arg in ["boot-args", "csr-active-config", "amfi-allow-arguments"]:
+                    if target_arg not in self.config["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]:
+                        self.config["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].append(target_arg)
+
+                # Fetch template boot-args, scrub any accidental Lilu flags inherited from template plists
+                raw_args = self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].get("boot-args", "")
+                scrubbed_args = " ".join([arg for arg in raw_args.split() if not arg.startswith("-lilu")])
+                
+                # Append required T2 args safely without compounding spaces
+                t2_args = "-ibtcompatbeta -amfipassbeta"
+                self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = f"{scrubbed_args} {t2_args}".strip()
+                
+                # Ensure WriteFlash is enabled to commit changes to SPI ROM
+                self.config["NVRAM"]["WriteFlash"] = True
+                
+                # Force DisableIoMapper for stability
                 self.config["Kernel"]["Quirks"]["DisableIoMapper"] = True
+
             except Exception as e:
                 logging.error("Whoops, the app failed to inject the required kexts because of the following error:")
-                logging.exception("Stack Trace:") # This prints the full technical error
+                logging.exception("Stack Trace:")
                 logging.info("Please try again later.")
                 sys.exit(3)
-
-        # macOS Sequoia/Tahoe support for Lilu plugins
-        # NOTE: T2 Macs must NOT use any -lilu* flag.
-        # -lilubetaall and -liluforce both cause Lilu to inject into
-        # com.apple.kec.corecrypto, which breaks the FIPS POST self-test
-        # and causes a kernel panic at _corecrypto_kext_start on Tahoe.
-        # T2 boot relies on AMFIPass + -amfipassbeta instead.
-        if self.model not in model_array.T2Macs:
+        else:
+            # For Non-T2 Legacy Hardware
+            if "NVRAM" not in self.config:
+                self.config["NVRAM"] = {"Add": {}}
+            if "7C436110-AB2A-4BBB-A880-FE41995C9F82" not in self.config["NVRAM"]["Add"]:
+                self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"] = {"boot-args": ""}
+                
             current_boot_args = self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"]
             if "-lilubetaall" not in current_boot_args:
-                self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " -lilubetaall"
+                self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = f"{current_boot_args} -lilubetaall".strip()
 
         # Call support functions
         for function in [
@@ -161,7 +179,7 @@ class BuildOpenCore:
             logging.info("- Adding bootmgfw.efi BlessOverride")
             if "BlessOverride" not in self.config["Misc"]:
                 self.config["Misc"]["BlessOverride"] = []
-                self.config["Misc"]["BlessOverride"].append("\\EFI\\Microsoft\\Boot\\bootmgfw.efi")
+            self.config["Misc"]["BlessOverride"].append("\\EFI\\Microsoft\\Boot\\bootmgfw.efi")
     
     
     def _mount_efi_partition(self) -> bool:
