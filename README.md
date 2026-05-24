@@ -55,8 +55,6 @@
 |---|---|
 | Macmini8,1 | Mac mini 2018 |
 | MacPro7,1 | Mac Pro 2019 |
-| iMac19,1 | iMac 27-inch 2019 |
-| iMac19,2 | iMac 21.5-inch 2019 |
 | iMac20,1 | iMac 27-inch 2020 |
 | iMac20,2 | iMac 27-inch 2020 CTO |
 
