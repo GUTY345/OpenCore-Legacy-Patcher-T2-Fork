@@ -23,7 +23,7 @@ logging.basicConfig(
 
 def extract_and_copy_tools():
     """
-    Locates OpenCoreLegacyPatcherTools.zip, extracts the archive, and copies 
+    Locates OpenCoreTools.zip, extracts the archive, and copies 
     the necessary binaries to payloads/OpenCore.
     """
     try:
@@ -34,7 +34,7 @@ def extract_and_copy_tools():
 
         # Locate the ZIP file
         zip_path = None
-        for file in base_dir.rglob("OpenCoreLegacyPatcherTools.zip"):
+        for file in base_dir.rglob("OpenCoreTools.zip"):
             zip_path = file
             break
         
@@ -44,7 +44,7 @@ def extract_and_copy_tools():
                 break
 
         if not zip_path:
-            print("[WARN] Could not locate OpenCoreLegacyPatcherTools.zip. Proceeding...")
+            print("[WARN] Could not locate OpenCoreTools.zip. Proceeding...")
             return
 
         print(f"[INFO] Found archive at: {zip_path}")
