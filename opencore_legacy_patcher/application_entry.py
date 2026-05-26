@@ -124,14 +124,17 @@ class OpenCoreLegacyPatcher:
             return
 
         logging.info("Detected arguments, switching to CLI mode")
-        self.constants.gui_mode = True  # Assumes no user interaction is required
+        self.constants.cli_mode = True  # Fixed: Match the intended mode
+        self.constants.gui_mode = False 
 
         ignore_args = ["--auto_patch", "--gui_patch", "--gui_unpatch", "--update_installed"]
+        
+        # If none of the specific arguments are in sys.argv
         if not any(x in sys.argv for x in ignore_args):
             self.constants.current_path = Path.cwd()
-        ignore_args = ignore_args.pop(0)
 
-        if not any(x in sys.argv for x in ignore_args):
+        # If --auto_patch (the first item) is NOT in sys.argv, wait for unpacking to finish
+        if "--auto_patch" not in sys.argv:
             while self.constants.unpack_thread.is_alive():
                 time.sleep(self.constants.thread_sleep_interval)
 
