@@ -1055,34 +1055,36 @@ class SettingsFrame(wx.Frame):
                 title = child
                 break
 
-        lines = f"""Application Information:
-    Application Version: {self.constants.patcher_version}
-    PatcherSupportPkg Version: {self.constants.patcher_support_pkg_version}
-    Application Path: {self.constants.launcher_binary}
-    Application Mount: {self.constants.payload_path}
-
-Commit Information:
-    Branch: {self.constants.commit_info[0]}
-    Date: {self.constants.commit_info[1]}
-    URL: {self.constants.commit_info[2] if self.constants.commit_info[2] != "" else "N/A"}
-
-Booted Information:
-    Booted OS: XNU {self.constants.detected_os} ({self.constants.detected_os_version})
-    Booted Patcher Version: {self.constants.computer.oclp_version}
-    Booted OpenCore Version: {self.constants.computer.opencore_version}
-    Booted OpenCore Disk: {self.constants.booted_oc_disk}
-
-Hardware Information:
-    {pprint.pformat(self.constants.computer, indent=4)}
-"""
+            lines = f"""Application Information:
+        Application Version: {self.constants.patcher_version}
+        PatcherSupportPkg Version: {self.constants.patcher_support_pkg_version}
+        Application Path: {self.constants.launcher_binary}
+        Application Mount: {self.constants.payload_path}
+    
+        Commit Information:
+            Branch: {self.constants.commit_info[0]}
+            Date: {self.constants.commit_info[1]}
+            URL: {self.constants.commit_info[2] if self.constants.commit_info[2] != "" else "N/A"}
+        
+        Booted Information:
+            Booted OS: XNU {self.constants.detected_os} ({self.constants.detected_os_version})
+            Booted Patcher Version: {self.constants.computer.oclp_version}
+            Booted OpenCore Version: {self.constants.computer.opencore_version}
+            Booted OpenCore Disk: {self.constants.booted_oc_disk}
+        
+        Hardware Information:
+            {pprint.pformat(self.constants.computer, indent=4)}
+        """
         # TextCtrl: properties
         self.app_stats = wx.TextCtrl(panel, value=lines, pos=(-1, title.GetPosition()[1] + 30), size=(600, 240), style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_RICH2)
         self.app_stats.SetFont(gui_support.font_factory(13, wx.FONTWEIGHT_NORMAL))
 
 
-    def on_checkbox(self, event: wx.Event, warning_pop: str = "", override_function: bool = False) -> None:
+    def on_checkbox(self, event: wx.Event, warning_pop: str = "", override_function: object = None) -> None:
         """
         Handles checkbox toggle actions across settings blocks defensively.
+        Safely captures varied hardware labels and avoids NoneType crashes 
+        when manipulating dynamic parent UI contexts.
         """
         label = event.GetEventObject().GetLabel()
         value = event.GetEventObject().GetValue()
@@ -1093,37 +1095,57 @@ Hardware Information:
                 event.GetEventObject().SetValue(not event.GetEventObject().GetValue())
                 return
             
-            # FIX: Normalize matching string check to capture both label configurations safely
+            # Catch normalized configurations for either variation of the native check string
             if label in ["Allow native models", "Allow spoofing native Macs"]:
                 if self.constants.computer.real_model in smbios_data.smbios_dictionary:
                     if self.constants.detected_os > smbios_data.smbios_dictionary[self.constants.computer.real_model]["Max OS Supported"]:
                         chassis_type = "aluminum"
                         if self.constants.computer.real_model in ["MacBook5,2", "MacBook6,1", "MacBook7,1"]:
                             chassis_type = "plastic"
-                        dlg = wx.MessageDialog(self.frame_modal, f"This model, {self.constants.computer.real_model}, does not natively support macOS {os_data.os_conversion.kernel_to_os(self.constants.detected_os)}, {os_data.os_conversion.convert_kernel_to_marketing_name(self.constants.detected_os)}. The last native OS was macOS {os_data.os_conversion.kernel_to_os(smbios_data.smbios_dictionary[self.constants.computer.real_model]['Max OS Supported'])}, {os_data.os_conversion.convert_kernel_to_marketing_name(smbios_data.smbios_dictionary[self.constants.computer.real_model]['Max OS Supported'])}\n\nToggling this option will break booting on this OS. Are you absolutely certain this is desired?\n\nYou may end up with a nice {chassis_type} brick 🧱", "Are you certain?", wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
+                        
+                        dlg = wx.MessageDialog(
+                            self.frame_modal, 
+                            f"This model, {self.constants.computer.real_model}, does not natively support macOS {os_data.os_conversion.kernel_to_os(self.constants.detected_os)}, {os_data.os_conversion.convert_kernel_to_marketing_name(self.constants.detected_os)}. The last native OS was macOS {os_data.os_conversion.kernel_to_os(smbios_data.smbios_dictionary[self.constants.computer.real_model]['Max OS Supported'])}, {os_data.os_conversion.convert_kernel_to_marketing_name(smbios_data.smbios_dictionary[self.constants.computer.real_model]['Max OS Supported'])}\n\nToggling this option will break booting on this OS. Are you absolutely certain this is desired?\n\nYou may end up with a nice {chassis_type} brick 🧱", 
+                            "Are you certain?", 
+                            wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT
+                        )
                         if dlg.ShowModal() == wx.ID_NO:
                             event.GetEventObject().SetValue(not event.GetEventObject().GetValue())
                             return
 
-        if override_function is True:
-            self.settings[self._find_parent_for_key(label)][label]["override_function"](self.settings[self._find_parent_for_key(label)][label]["variable"], value, self.settings[self._find_parent_for_key(label)][label]["constants_variable"] if "constants_variable" in self.settings[self._find_parent_for_key(label)][label] else None)
+        # Execute structural override if a valid callable execution block passed down through lambda loop
+        if override_function is not None and callable(override_function):
+            parent_key = self._find_parent_for_key(label)
+            target_node = self.settings[parent_key][label]
+            override_function(target_node["variable"], value, target_node.get("constants_variable", None))
             return
 
-        self._update_setting(self.settings[self._find_parent_for_key(label)][label]["variable"], value)
+        # Fallback to standard variable updates
+        parent_key = self._find_parent_for_key(label)
+        if label in self.settings[parent_key]:
+            self._update_setting(self.settings[parent_key][label]["variable"], value)
         
-        # FIX: Align label target criteria with dynamic schema keys safely
+        # Safely handle UI button state updates depending on which frame opened Settings
         if label in ["Allow native models", "Allow spoofing native Macs"]:
-            # Check if parent exists and actually has an initialized build_button instance
-            if hasattr(self, "parent") and self.parent and hasattr(self.parent, "build_button"):
-                if self.parent.build_button is not None:
+            if hasattr(self, "parent") and self.parent:
+                target_button = None
+                
+                # Case A: If parent is the standalone Build/Model selection Frame
+                if hasattr(self.parent, "build_button"):
+                    target_button = self.parent.build_button
+                # Case B: If parent is MainFrame, look inside its active sub-panels if they exist
+                elif hasattr(self.parent, "build_panel") and hasattr(self.parent.build_panel, "build_button"):
+                    target_button = self.parent.build_panel.build_button
+                
+                # If we found a valid UI button reference anywhere in the frame tree, update it
+                if target_button is not None:
                     if gui_support.CheckProperties(self.constants).host_can_build() is True:
-                        self.parent.build_button.Enable()
+                        target_button.Enable()
                     else:
-                        self.parent.build_button.Disable()
+                        target_button.Disable()
                 else:
-                    logging.info(f"Parent build_button is unallocated. Status update for '{label}' bypassed.")
-            else:
-                logging.info(f"Parent structure does not maintain a build layout button hook; state manipulation bypassed.")
+                    # This is normal when Settings is accessed directly from the main menu frame!
+                    logging.info(f"Active build button frame context not currently drawn on screen. Value updated silently in configuration backend.")
 
     def on_spinctrl(self, event: wx.Event, label: str) -> None:
         """
