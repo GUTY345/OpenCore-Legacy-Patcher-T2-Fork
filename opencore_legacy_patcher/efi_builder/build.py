@@ -178,7 +178,7 @@ class BuildOpenCore:
             self.config["Misc"]["BlessOverride"].append("\\EFI\\Microsoft\\Boot\\bootmgfw.efi")
     
     
-  def _mount_efi_partition(self) -> bool:
+    def _mount_efi_partition(self) -> bool:
         """
         Locate and mount the custom 'OpenCore' partition. 
         If it does not exist, attempts to non-destructively create a 200MB FAT32 
