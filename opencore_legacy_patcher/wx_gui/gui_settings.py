@@ -808,13 +808,16 @@ class SettingsFrame(wx.Frame):
                     ],
                     "warning": "This option should only be used if your Mac natively supports the OSes you wish to run.\n\nIf you are currently running an unsupported OS, this option will break booting. Only toggle for enabling OS features on a native Mac.\n\nAre you certain you want to continue?",
                 },
-                "Ignore App Updates": {
+                "Disable App Updates (not recommended)": {
                     "type": "checkbox",
                     "value": global_settings.GlobalEnviromentSettings().read_property("IgnoreAppUpdates") or self.constants.ignore_updates,
                     "variable": "IgnoreAppUpdates",
                     "constants_variable": "ignore_updates",
                     "description": [
-                        # "Ignore app updates",
+                        "This disables OpenCore Legacy Patcher T2 updates.",
+                        "Not recommended as disabling app updates makes",
+                        "you vulnerable to newly discovered vulnerabilities that",
+                        "have been already patched."
                     ],
                     "override_function": self._update_global_settings,
                 },
