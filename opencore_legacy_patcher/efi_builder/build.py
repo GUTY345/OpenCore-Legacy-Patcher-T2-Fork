@@ -21,18 +21,18 @@ from ..support import utilities
 from ..datasets import model_array
 
 from .networking import (
-wired,
-wireless
+    wired,
+    wireless
 )
 from . import (
-bluetooth,
-firmware,
-graphics_audio,
-support,
-storage,
-smbios,
-security,
-misc
+    bluetooth,
+    firmware,
+    graphics_audio,
+    support,
+    storage,
+    smbios,
+    security,
+    misc
 )
 
 def rmtree_handler(func, path, exc_info) -> None:
@@ -214,7 +214,7 @@ class BuildOpenCore:
         Locate and mount the custom 'OpenCore' partition. 
         If missing, extracts the physical slice size via a universal plist,
         shrinks the APFS container to create unallocated free space, and then
-        initializes the FAT32 partition to bypass file system formatter bugs.
+        initializes the FAT32 partition using a safe parent disk regex identifier.
         """
         import subprocess
         import logging
@@ -308,8 +308,9 @@ class BuildOpenCore:
                     if run_with_sudo(shrink_cmd):
                         logging.info("- APFS container shrunk successfully. Formatter bypass initializing...")
                         
-                        # Isolate the parent physical disk identifier (e.g., disk0s2 -> disk0)
-                        parent_disk = physical_slice.split("s")[0] if "s" in physical_slice else "disk0"
+                        # Isolate the parent physical disk identifier using regex to avoid "di" slicing errors
+                        disk_match = re.match(r"^(disk\d+)", physical_slice)
+                        parent_disk = disk_match.group(1) if disk_match else "disk0"
                         
                         # Step B: Turn that newly created free space into our target FAT32 volume
                         create_cmd = f"diskutil addPartition {parent_disk} FAT32 OpenCore 0"
