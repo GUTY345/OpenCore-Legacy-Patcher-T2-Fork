@@ -301,36 +301,80 @@ class BuildOpenCore:
                 if total_bytes > 0:
                     # Deduct exactly 210,000,000 bytes (~200MB) from current container boundaries
                     target_bytes = total_bytes - 210000000
-                    logging.info("- Launching background TTY execution wrapper for atomic partitioning...")
+                    logging.info("- Executing low-level container shrink pass...")
 
-                    # Consolidate the entire command into a single string
-                    target_cmd_string = f"diskutil apfs resizeContainer {physical_slice} {target_bytes}B FAT32 OpenCore 200M"
+                    # Step 1: Shrink the container alone. This leaves pure, raw free space trailing the partition.
+                    shrink_cmd = f"diskutil apfs resizeContainer {physical_slice} {target_bytes}B"
+                    if not run_with_sudo(shrink_cmd):
+                        logging.error("- Failed to execute background container shrink sequence.")
+                        return False
+
+                    logging.info("- Container shrunk. Slicing raw partition map...")
+
+                    # Isolate parent disk and identify target map parameters
+                    disk_match = re.match(r"^(disk\d+)", physical_slice)
+                    parent_disk = disk_match.group(1) if disk_match else "disk0"
+
+                    # Step 2: Add the partition slice wrapper using 'FREE' as the format argument.
+                    # This tells diskutil to alter the GPT partition tables WITHOUT calling the formatting binary.
+                    # This safely side-steps the timing loop race condition entirely.
+                    map_slice_cmd = f"diskutil addPartition {physical_slice} FREE OpenCore 200M"
                     
-                    # Wrap the target diskutil string into an insulated background shell execution context.
-                    # This fools the OS disk arbitration framework into thinking it's handling a true
-                    # interactive session, preventing it from instantly locking the raw blocks out.
-                    bg_terminal_cmd = [
+                    # We capture diskutil's output to figure out which exact slice number was created (e.g., disk0s3)
+                    logging.info(f"- Registering new raw map node entry via: {map_slice_cmd}")
+                    osascript_wrapper = [
                         "osascript", "-e",
-                        f'do shell script "bash -c \\"{target_cmd_string}\\"" with administrator privileges'
+                        f'do shell script "{map_slice_cmd}" with administrator privileges'
                     ]
                     
-                    logging.info(f"- Dispatching privileged background worker...")
-                    process_run = subprocess.run(bg_terminal_cmd, capture_output=True, text=True)
-                    
-                    if process_run.returncode == 0:
-                        logging.info("- Background atomic drive mapping and formatting finalized successfully!")
-                        create_cmd = ""  # Clear block to skip secondary background passes
-                    else:
-                        stderr_output = process_run.stderr.strip() if process_run.stderr else "Unknown error"
-                        logging.error(f"- Background transaction failed: {stderr_output}")
+                    slice_alloc_run = subprocess.run(osascript_wrapper, capture_output=True, text=True)
+                    if slice_alloc_run.returncode != 0:
+                        logging.error(f"- GPT table modification rejected: {slice_alloc_run.stderr.strip()}")
                         return False
-            # Execute final partition layout transformation entries
-            if create_cmd and run_with_sudo(create_cmd):
-                logging.info("- Partition created out of macOS container space successfully.")
-                return True
-            else:
-                logging.error("- Failed to finalize drive formatting structures.")
-                return False
+
+                    # Scan the system map topology again to accurately grab our newly created unformatted partition slice
+                    result_refresh = subprocess.check_output(["diskutil", "list"], text=True)
+                    new_slice_id = ""
+                    for line in result_refresh.splitlines():
+                        if "OpenCore" in line or "0x0B" in line: # Fallback to checking raw MBR/FAT hex IDs if label is blank
+                            parts = line.strip().split()
+                            if parts and parts[-1].startswith("disk"):
+                                new_slice_id = parts[-1]
+                                break
+
+                    if not new_slice_id:
+                        # Fallback heuristic guess: if physical is disk0s2, next free slot is likely disk0s3
+                        slice_match = re.search(r"disk\d+s(\d+)", physical_slice)
+                        next_index = int(slice_match.group(1)) + 1 if slice_match else 3
+                        new_slice_id = f"{parent_disk}s{next_index}"
+
+                    logging.info(f"- Target partition slice localized at: {new_slice_id}")
+
+                    # Step 3: Raw block format phase. 
+                    # First, force unmount the slice to break any ghost volume probes or system locks.
+                    # Second, use newfs_msdos directly on the raw device block (rdsk) instead of the standard block device (disk).
+                    raw_device_node = new_slice_id.replace("disk", "rdsk")
+                    
+                    format_sequence = (
+                        f"diskutil unmountDisk {new_slice_id}; "
+                        f"diskutil unmount {new_slice_id}; "
+                        f"/sbin/newfs_msdos -F 32 -v OpenCore /dev/{raw_device_node}; "
+                        f"diskutil mount {new_slice_id}"
+                    )
+
+                    logging.info(f"- Injecting native FAT32 structure directly onto raw block /dev/{raw_device_node}...")
+                    format_wrapper = [
+                        "osascript", "-e",
+                        f'do shell script "{format_sequence}" with administrator privileges'
+                    ]
+                    
+                    final_format_run = subprocess.run(format_wrapper, capture_output=True, text=True)
+                    if final_format_run.returncode == 0:
+                        logging.info("- Direct-to-block storage allocation and formatting finalized successfully!")
+                        create_cmd = "" # Clear cascade marker to finalize execution tree
+                    else:
+                        logging.error(f"- Raw block format stage rejected: {final_format_run.stderr.strip()}")
+                        return False
 
         except Exception as e:
             logging.error("- Critical exception encountered during disk block allocation management.")
