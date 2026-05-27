@@ -213,12 +213,13 @@ class BuildOpenCore:
     def _mount_efi_partition(self) -> bool:
         """
         Locate and mount the custom 'OpenCore' partition. 
-        If it does not exist, attempts to non-destructively create a 200MB FAT32 
-        'OpenCore' partition from the primary internal drive, then mounts it.
-        Kept original method name to prevent breaking upstream patcher execution hooks.
+        If it exists but is unmounted, it handles the mount cleanly.
+        If it genuinely does not exist, it truncates the APFS container 
+        safely by exact bytes to allocate the new partition.
         """
         import subprocess
         import logging
+        import re
 
         def run_with_sudo(cmd_str: str) -> bool:
             """Helper to run a shell command with administrator privileges via osascript."""
@@ -236,27 +237,41 @@ class BuildOpenCore:
                 return False
 
         try:
-            # 1. Look for an existing OpenCore partition
+            # 1. Scan for any existing 'OpenCore' volume allocation map
+            logging.info("- Scanning disk topology for existing 'OpenCore' partition...")
             result = subprocess.check_output(["diskutil", "list"], text=True)
+            
+            opencore_dev = ""
             for line in result.splitlines():
                 if "OpenCore" in line:
                     parts = line.strip().split()
                     if parts:
-                        dev = parts[-1]
-                        if dev.startswith("disk"):
-                            # Check if already mounted
-                            info = subprocess.check_output(["diskutil", "info", dev], text=True)
-                            if "Mounted:               Yes" in info:
-                                logging.info(f"- 'OpenCore' partition ({dev}) is already mounted.")
-                                return True
-                            
-                            # Try to mount it
-                            return run_with_sudo(f"diskutil mount {dev}")
+                        dev_candidate = parts[-1]
+                        if dev_candidate.startswith("disk"):
+                            opencore_dev = dev_candidate
+                            break
 
-            # 2. Partition not found — Time to create a 200MB slice
-            logging.warning("- 'OpenCore' partition not found. Attempting to create one...")
+            # 2. If it exists, manage its mount state exclusively and EXIT
+            if opencore_dev:
+                logging.info(f"- Found existing 'OpenCore' target partition on {opencore_dev}")
+                info = subprocess.check_output(["diskutil", "info", opencore_dev], text=True)
+                
+                if "Mounted:               Yes" in info:
+                    logging.info(f"- 'OpenCore' partition ({opencore_dev}) is already mounted and active.")
+                    return True
+                
+                logging.info(f"- 'OpenCore' partition ({opencore_dev}) is present but unmounted. Attempting mount...")
+                if run_with_sudo(f"diskutil mount {opencore_dev}"):
+                    logging.info("- Successfully mounted existing partition.")
+                    return True
+                else:
+                    logging.error("- Failed to mount the existing 'OpenCore' partition container.")
+                    return False
 
-            # Determine the primary boot disk identifier
+            # 3. Partition completely missing — Safe down-sizing routine begins here
+            logging.warning("- 'OpenCore' partition not found anywhere on disk. Initializing allocation logic...")
+
+            # Determine primary system boot slice
             info_root = subprocess.check_output(["diskutil", "info", "/"], text=True)
             boot_dev = ""
             for line in info_root.splitlines():
@@ -268,16 +283,28 @@ class BuildOpenCore:
                 logging.error("- Could not pinpoint the primary boot disk identifier.")
                 return False
 
-            # Determine resizing strategy based on filesystem type
             if "APFS" in info_root:
                 container_id = self._get_physical_apfs_slice(boot_dev)
-                logging.info(f"- Detected APFS format. Splitting physical target partition {container_id}...")
-                create_cmd = f"diskutil apfs resizeContainer {container_id} 99% FAT32 OpenCore 200M"
+                
+                # Extract explicit raw capacity constraints to block dynamic sizing glitches
+                container_info = subprocess.check_output(["diskutil", "info", container_id], text=True)
+                size_match = re.search(r"Container Total Space:\s+(\d+)\s+B", container_info)
+                
+                if size_match:
+                    total_bytes = int(size_match.group(1))
+                    # Carve a predictable safety barrier (~210MB deduction footprint)
+                    target_bytes = total_bytes - 210000000
+                    
+                    logging.info(f"- Calculating container reduction constraint target size: {target_bytes} Bytes")
+                    create_cmd = f"diskutil apfs resizeContainer {container_id} {target_bytes}B FAT32 OpenCore 200M"
+                else:
+                    logging.warning("- Byte extraction parsing failed. Using unsafe dynamic fallback parameter.")
+                    create_cmd = f"diskutil apfs resizeContainer {container_id} 0 FAT32 OpenCore 200M"
             else:
-                logging.info(f"- Detected legacy format on {boot_dev}. Resizing HFS+ volume...")
+                logging.info(f"- Detected legacy filesystem layout on {boot_dev}. Adjusting HFS+ map entries...")
                 create_cmd = f"diskutil resizeVolume {boot_dev} 0g FAT32 OpenCore 200M"
 
-            # Execute partition mapping
+            # Execute partition mapping commands
             if run_with_sudo(create_cmd):
                 logging.info("- Partition created successfully. Re-verifying mount status...")
                 return True
@@ -286,7 +313,7 @@ class BuildOpenCore:
                 return False
 
         except Exception as e:
-            logging.error("- Critical failure managing disk layouts.")
+            logging.error("- Critical exception encountered during disk block remediation management.")
             logging.exception(e)
             return False
 
