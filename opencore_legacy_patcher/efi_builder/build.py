@@ -209,180 +209,107 @@ class BuildOpenCore:
                 self.config["Misc"]["BlessOverride"] = []
             self.config["Misc"]["BlessOverride"].append("\\EFI\\Microsoft\\Boot\\bootmgfw.efi")
     
-    def _mount_efi_partition(self) -> bool:
+    def _mount_efi_partition(self, physical_slice, total_bytes):
         """
-        Locate and mount the custom 'OpenCore' partition. 
-        If missing, extracts the physical slice size via a universal plist,
-        shrinks the APFS container to create unallocated free space, and then
-        initializes the FAT32 partition bounded to exactly 200M to accommodate
-        interleaved multi-boot drive schemes.
+        Locates, creates, and mounts the specialized OpenCore FAT32 target partition.
+        Bypasses modern macOS diskarbitrationd timing loops using raw character device 
+        manipulation sequences via background privileged wrappers.
         """
-        import subprocess
-        import logging
-        import plistlib
-        import re
+        logging.info(f"Preparing storage layout topology for target: {physical_slice}")
+        new_slice_id = ""
 
-        def run_with_sudo(cmd_str: str) -> bool:
-            """Helper to run a shell command with administrator privileges via osascript."""
-            logging.info(f"- Executing privileged command: {cmd_str}")
-            osascript_cmd = [
-                "osascript", "-e",
-                f'do shell script "{cmd_str}" with administrator privileges'
-            ]
-            try:
-                subprocess.run(osascript_cmd, check=True, capture_output=True)
-                return True
-            except subprocess.CalledProcessError as e:
-                stderr_err = e.stderr.decode().strip() if e.stderr else ""
-                logging.error(f"Sudo command failed: {stderr_err if stderr_err else e}")
+        if total_bytes > 0:
+            # Deduct exactly 210,000,000 bytes (~200MB) from current container boundaries
+            target_bytes = total_bytes - 210000000
+            logging.info("- Executing low-level container shrink pass...")
+
+            # Step 1: Shrink the container alone.
+            shrink_cmd = f"diskutil apfs resizeContainer {physical_slice} {target_bytes}B"
+            if not run_with_sudo(shrink_cmd):
+                logging.error("- Failed to execute background container shrink sequence.")
                 return False
 
-        try:
-            # 1. Scan for any existing 'OpenCore' volume allocation map
-            logging.info("- Scanning disk topology for existing 'OpenCore' partition...")
-            result = subprocess.check_output(["diskutil", "list"], text=True)
-            
-            opencore_dev = ""
-            for line in result.splitlines():
-                if "OpenCore" in line:
-                    parts = line.strip().split()
-                    if parts:
-                        dev_candidate = parts[-1]
-                        if dev_candidate.startswith("disk"):
-                            opencore_dev = dev_candidate
-                            break
+            logging.info("- Container shrunk. Slicing raw partition map...")
 
-            # 2. If it exists, manage its mount state exclusively and EXIT
-            if opencore_dev:
-                logging.info(f"- Found existing 'OpenCore' target partition on {opencore_dev}")
-                info = subprocess.check_output(["diskutil", "info", opencore_dev], text=True)
+            # Isolate parent disk and identify target map parameters
+            disk_match = re.match(r"^(disk\d+)", physical_slice)
+            parent_disk = disk_match.group(1) if disk_match else "disk0"
+
+            # Step 2: Add an unformatted partition placeholder.
+            # Passing 'FREE' prevents diskutil from calling a formatting binary automatically,
+            # which cleanly avoids the auto-mount lock collision crash (Error -69832).
+            map_slice_cmd = f"diskutil addPartition {parent_disk} FREE Placeholder 0"
+            logging.info(f"- Registering new raw map node entry via: {map_slice_cmd}")
+            
+            osascript_wrapper = [
+                "osascript", "-e",
+                f'do shell script "{map_slice_cmd}" with administrator privileges'
+            ]
+            
+            slice_alloc_run = subprocess.run(osascript_wrapper, capture_output=True, text=True)
+            if slice_alloc_run.returncode != 0:
+                logging.error(f"- GPT table modification rejected: {slice_alloc_run.stderr.strip()}")
+                return False
+
+            # Extract the newly created disk partition slice directly from stdout execution output
+            # diskutil returns lines explicitly like: "Created new partition disk0s10 on disk0"
+            stdout_output = slice_alloc_run.stdout if slice_alloc_run.stdout else ""
+            slice_match = re.search(rf"({parent_disk}s\d+)", stdout_output)
+            
+            if slice_match:
+                new_slice_id = slice_match.group(1)
+                logging.info(f"- Safely extracted real partition target index: {new_slice_id}")
+            else:
+                # Fallback query lookup targeting unformatted basic data blocks on the parent disk scheme
+                logging.warning("- Could not parse slice ID from stdout. Running fallback query verification...")
+                result_refresh = subprocess.check_output(["diskutil", "list"], text=True)
+                found_slices = []
+                for line in result_refresh.splitlines():
+                    if "Microsoft Basic Data" in line and "MB" in line:
+                        parts = line.strip().split()
+                        if parts and parts[-1].startswith(f"{parent_disk}s"):
+                            idx = int(parts[-1].replace(f"{parent_disk}s", ""))
+                            found_slices.append((idx, parts[-1]))
                 
-                if "Mounted:               Yes" in info:
-                    logging.info(f"- 'OpenCore' partition ({opencore_dev}) is already mounted and active.")
-                    return True
-                
-                logging.info(f"- 'OpenCore' partition ({opencore_dev}) is present but unmounted. Attempting mount...")
-                if run_with_sudo(f"diskutil mount {opencore_dev}"):
-                    logging.info("- Successfully mounted existing partition.")
-                    return True
+                if found_slices:
+                    # Sort by index descending to grab the newest registered map block leaf
+                    found_slices.sort(key=lambda x: x[0], reverse=True)
+                    new_slice_id = found_slices[0][1]
                 else:
-                    logging.error("- Failed to mount the existing 'OpenCore' partition container.")
+                    logging.error("- Completely lost tracking context of the raw partition node block.")
                     return False
 
-            # 3. Partition completely missing — Safe shrinkage sequence begins
-            logging.warning("- 'OpenCore' partition not found anywhere on disk. Initializing allocation logic...")
+            logging.info(f"- Target partition slice verified at: {new_slice_id}")
 
-            # Determine primary system boot slice identifier
-            info_root = subprocess.check_output(["diskutil", "info", "/"], text=True)
-            boot_dev = ""
-            for line in info_root.splitlines():
-                if "Device Identifier:" in line:
-                    boot_dev = line.split()[-1]
-                    break
+            # Step 3: Raw block format phase. 
+            # We call newfs_msdos straight against the raw device node character interface (/dev/rdsk) 
+            # instead of buffered storage nodes (/dev/disk) to ignore framework system locks entirely.
+            raw_device_node = new_slice_id.replace("disk", "rdsk")
             
-            if not boot_dev:
-                logging.error("- Could not pinpoint the primary boot disk identifier.")
+            format_sequence = (
+                f"diskutil unmountDisk {new_slice_id}; "
+                f"diskutil unmount {new_slice_id}; "
+                f"/sbin/newfs_msdos -F 32 -v OpenCore /dev/{raw_device_node}; "
+                f"diskutil mount {new_slice_id} || (diskutil updateVolumeMappings {parent_disk} && diskutil mount {new_slice_id})"
+            )
+
+            logging.info(f"- Injecting native FAT32 structure directly onto raw block /dev/{raw_device_node}...")
+            format_wrapper = [
+                "osascript", "-e",
+                f'do shell script "{format_sequence}" with administrator privileges'
+            ]
+            
+            final_format_run = subprocess.run(format_wrapper, capture_output=True, text=True)
+            if final_format_run.returncode == 0:
+                logging.info("- Direct-to-block storage allocation and formatting finalized successfully!")
+                return True
+            else:
+                logging.error(f"- Raw block format stage rejected: {final_format_run.stderr.strip()}")
                 return False
-
-            create_cmd = ""
-            if "APFS" in info_root:
-                physical_slice = self._get_physical_apfs_slice(boot_dev)
-                total_bytes = 0
-                
-                try:
-                    # Query the physical slice directly (e.g., disk0s2)
-                    slice_plist_raw = subprocess.check_output(["diskutil", "info", "-plist", physical_slice])
-                    slice_data = plistlib.loads(slice_plist_raw)
-                    total_bytes = slice_data.get("Size", 0)
-                    logging.info(f"- Successfully extracted physical slice size: {total_bytes} Bytes")
-                except Exception as plist_err:
-                    logging.warning(f"- Plist structural parsing failed: {plist_err}")
-
-                if total_bytes > 0:
-                    # Deduct exactly 210,000,000 bytes (~200MB) from current container boundaries
-                    target_bytes = total_bytes - 210000000
-                    logging.info("- Executing low-level container shrink pass...")
-
-                    # Step 1: Shrink the container alone. This leaves pure, raw free space trailing the partition.
-                    shrink_cmd = f"diskutil apfs resizeContainer {physical_slice} {target_bytes}B"
-                    if not run_with_sudo(shrink_cmd):
-                        logging.error("- Failed to execute background container shrink sequence.")
-                        return False
-
-                    logging.info("- Container shrunk. Slicing raw partition map...")
-
-                    # Isolate parent disk and identify target map parameters
-                    disk_match = re.match(r"^(disk\d+)", physical_slice)
-                    parent_disk = disk_match.group(1) if disk_match else "disk0"
-
-                    # Step 2: Add an unformatted partition placeholder.
-                    # We pass 'FREE' as the filesystem type and '0' as the size.
-                    # This tells diskutil to fill the exact 210MB free space gap we just carved out 
-                    # without running a file system formatter or triggering error -69850.
-                    # We target the parent_disk (e.g., disk0) so the GPT layout updates properly.
-                    map_slice_cmd = f"diskutil addPartition {parent_disk} FREE OpenCore 0"
-                    
-                    # We capture diskutil's output to figure out which exact slice number was created (e.g., disk0s3)
-                    logging.info(f"- Registering new raw map node entry via: {map_slice_cmd}")
-                    osascript_wrapper = [
-                        "osascript", "-e",
-                        f'do shell script "{map_slice_cmd}" with administrator privileges'
-                    ]
-                    
-                    slice_alloc_run = subprocess.run(osascript_wrapper, capture_output=True, text=True)
-                    if slice_alloc_run.returncode != 0:
-                        logging.error(f"- GPT table modification rejected: {slice_alloc_run.stderr.strip()}")
-                        return False
-
-                    # Scan the system map topology again to accurately grab our newly created unformatted partition slice
-                    result_refresh = subprocess.check_output(["diskutil", "list"], text=True)
-                    new_slice_id = ""
-                    for line in result_refresh.splitlines():
-                        if "OpenCore" in line or "0x0B" in line: # Fallback to checking raw MBR/FAT hex IDs if label is blank
-                            parts = line.strip().split()
-                            if parts and parts[-1].startswith("disk"):
-                                new_slice_id = parts[-1]
-                                break
-
-                    if not new_slice_id:
-                        # Fallback heuristic guess: if physical is disk0s2, next free slot is likely disk0s3
-                        slice_match = re.search(r"disk\d+s(\d+)", physical_slice)
-                        next_index = int(slice_match.group(1)) + 1 if slice_match else 3
-                        new_slice_id = f"{parent_disk}s{next_index}"
-
-                    logging.info(f"- Target partition slice localized at: {new_slice_id}")
-
-                    # Step 3: Raw block format phase. 
-                    # First, force unmount the slice to break any ghost volume probes or system locks.
-                    # Second, use newfs_msdos directly on the raw device block (rdsk) instead of the standard block device (disk).
-                    raw_device_node = new_slice_id.replace("disk", "rdsk")
-                    
-                    format_sequence = (
-                        f"diskutil unmountDisk {new_slice_id}; "
-                        f"diskutil unmount {new_slice_id}; "
-                        f"/sbin/newfs_msdos -F 32 -v OpenCore /dev/{raw_device_node}; "
-                        f"diskutil mount {new_slice_id}"
-                    )
-
-                    logging.info(f"- Injecting native FAT32 structure directly onto raw block /dev/{raw_device_node}...")
-                    format_wrapper = [
-                        "osascript", "-e",
-                        f'do shell script "{format_sequence}" with administrator privileges'
-                    ]
-                    
-                    final_format_run = subprocess.run(format_wrapper, capture_output=True, text=True)
-                    if final_format_run.returncode == 0:
-                        logging.info("- Direct-to-block storage allocation and formatting finalized successfully!")
-                        create_cmd = "" # Clear cascade marker to finalize execution tree
-                    else:
-                        logging.error(f"- Raw block format stage rejected: {final_format_run.stderr.strip()}")
-                        return False
-
-        except Exception as e:
-            logging.error("- Critical exception encountered during disk block allocation management.")
-            logging.exception(e)
+        else:
+            logging.error("- Provided physical block target initialization size is empty.")
             return False
-
+    
     def _generate_base(self) -> None:
         """
         Generate OpenCore base folder and config
