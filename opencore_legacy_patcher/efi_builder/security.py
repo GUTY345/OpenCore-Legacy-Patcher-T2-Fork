@@ -356,22 +356,6 @@ class BuildSecurity:
                 "MinKernel": "25.0.0"
             })
 
-        # 6. Bypass corecrypto FIPS POST self-test on T2 Macs (Tahoe)
-        # Fix corecrypto kernel panics caused by fixing the too long binary patch length
-        if not patch_exists("Bypass corecrypto FIPS POST (T2 Tahoe fix)"):
-            kernel_patches.append({
-                "Arch": "x86_64",
-                "Comment": "Bypass corecrypto FIPS POST (T2 Tahoe fix)",
-                "Enabled": True,
-                "Identifier": "com.apple.kec.corecrypto",
-                "Find": binascii.unhexlify("85C00F84"),
-                "Replace": binascii.unhexlify("85C090E9"),
-                "Mask": binascii.unhexlify("FFFFFFFF"),
-                "ReplaceMask": binascii.unhexlify("FFFFFFFF"),
-                "MinKernel": "25.0.0",
-                "MaxKernel": "25.99.99",
-                "Count": 1,
-            })
     # ------------------------------------------------------------------
     # Main build entry point
     # ------------------------------------------------------------------
