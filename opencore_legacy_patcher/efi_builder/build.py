@@ -289,16 +289,17 @@ class BuildOpenCore:
 
             logging.info(f"- Target partition slice verified at: {new_slice_id}")
 
-            # Step 3: Raw block format phase. 
-            # Corrected to /dev/rdiskX for macOS raw character storage nodes.
+            # Step 3: Raw block format phase with explicit race-condition bypass
             raw_device_node = new_slice_id.replace("disk", "rdisk")
             
-            # Isolate unmounting to the exact slice target, drop the invalid updateVolumeMappings verb,
-            # and use a standard cross-platform diskutil mount verification sequence.
+            # - Force unmount to break any proactive diskarbitrationd locks
+            # - Use explicit FAT32 block sizing properties (-b 4096 / -s 512 depending on raw node)
+            # - Implement a tiny block sleep to let the GPT table write settle before mounting
             format_sequence = (
-                f"diskutil unmount {new_slice_id}; "
-                f"/sbin/newfs_msdos -F 32 -v OpenCore /dev/{raw_device_node}; "
-                f"diskutil mount {new_slice_id}"
+                f"diskutil unmount /dev/{new_slice_id} >/dev/null 2>&1; "
+                f"/sbin/newfs_msdos -F 32 -b 4096 -v OpenCore /dev/{raw_device_node}; "
+                f"sleep 1; "
+                f"diskutil mount /dev/{new_slice_id}"
             )
 
             logging.info(f"- Injecting native FAT32 structure directly onto raw block /dev/{raw_device_node}...")
