@@ -290,15 +290,15 @@ class BuildOpenCore:
             logging.info(f"- Target partition slice verified at: {new_slice_id}")
 
             # Step 3: Raw block format phase. 
-            # We call newfs_msdos straight against the raw device node character interface (/dev/rdsk) 
-            # instead of buffered storage nodes (/dev/disk) to ignore framework system locks entirely.
-            raw_device_node = new_slice_id.replace("disk", "rdsk")
+            # Corrected to /dev/rdiskX for macOS raw character storage nodes.
+            raw_device_node = new_slice_id.replace("disk", "rdisk")
             
+            # Isolate unmounting to the exact slice target, drop the invalid updateVolumeMappings verb,
+            # and use a standard cross-platform diskutil mount verification sequence.
             format_sequence = (
-                f"diskutil unmountDisk {new_slice_id}; "
                 f"diskutil unmount {new_slice_id}; "
                 f"/sbin/newfs_msdos -F 32 -v OpenCore /dev/{raw_device_node}; "
-                f"diskutil mount {new_slice_id} || (diskutil updateVolumeMappings {parent_disk} && diskutil mount {new_slice_id})"
+                f"diskutil mount {new_slice_id}"
             )
 
             logging.info(f"- Injecting native FAT32 structure directly onto raw block /dev/{raw_device_node}...")
