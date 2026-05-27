@@ -8,7 +8,6 @@ import shutil
 import logging
 import zipfile
 import plistlib
-import logging
 import sys
 import subprocess
 import re
@@ -170,20 +169,24 @@ class BuildOpenCore:
                 sys.exit(3)
         else:
             # For Non-T2 Legacy Hardware
-            # Target 2017 iMac models specifically to bypass vt-d/broadcom complications
-            _IMAC_2017_MODELS = ["iMac18,1", "iMac18,2", "iMac18,3"]
-            if self.model in _IMAC_2017_MODELS:
-                if "dart=0" not in args_list:
-                    logging.info(f"- Appending dart=0 boot argument for 2017 iMac hardware target to fix WiFi/Bluetooth issues on macOS 26 Tahoe ({self.model})")
-                    args_list.append("dart=0")
             if "NVRAM" not in self.config:
                 self.config["NVRAM"] = {"Add": {}}
             if "7C436110-AB2A-4BBB-A880-FE41995C9F82" not in self.config["NVRAM"]["Add"]:
                 self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"] = {"boot-args": ""}
                 
             current_boot_args = self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"]
+            
+            # Target 2017 iMac models specifically to bypass vt-d/broadcom complications
+            _IMAC_2017_MODELS = ["iMac18,1", "iMac18,2", "iMac18,3"]
+            if self.model in _IMAC_2017_MODELS:
+                if "dart=0" not in current_boot_args:
+                    logging.info(f"- Appending dart=0 boot argument for 2017 iMac hardware target to fix WiFi/Bluetooth issues on macOS Tahoe ({self.model})")
+                    current_boot_args = f"{current_boot_args} dart=0".strip()
+
             if "-lilubetaall" not in current_boot_args:
-                self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = f"{current_boot_args} -lilubetaall".strip()
+                current_boot_args = f"{current_boot_args} -lilubetaall".strip()
+                
+            self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = current_boot_args
 
         # Call support functions
         for function in [
@@ -268,19 +271,19 @@ class BuildOpenCore:
             # Determine resizing strategy based on filesystem type
             if "APFS" in info_root:
                 container_id = self._get_physical_apfs_slice(boot_dev)
-            
-            logging.info(f"- Detected APFS format. Splitting physical target partition {container_id}...")
-            create_cmd = f"diskutil apfs resizeContainer {container_id} 0 FAT32 OpenCore 200M"
-            
+                logging.info(f"- Detected APFS format. Splitting physical target partition {container_id}...")
+                create_cmd = f"diskutil apfs resizeContainer {container_id} 0 FAT32 OpenCore 200M"
             else:
                 logging.info(f"- Detected legacy format on {boot_dev}. Resizing HFS+ volume...")
-                # Execute partition mapping
-                if run_with_sudo(create_cmd):
-                    logging.info("- Partition created successfully. Re-verifying mount status...")
-                    return True
-                else:
-                    logging.error("- Failed to resize drive map and allocate OpenCore partition.")
-                    return False
+                create_cmd = f"diskutil resizeVolume {boot_dev} 0g FAT32 OpenCore 200M"
+
+            # Execute partition mapping
+            if run_with_sudo(create_cmd):
+                logging.info("- Partition created successfully. Re-verifying mount status...")
+                return True
+            else:
+                logging.error("- Failed to resize drive map and allocate OpenCore partition.")
+                return False
 
         except Exception as e:
             logging.error("- Critical failure managing disk layouts.")
@@ -326,7 +329,7 @@ class BuildOpenCore:
                 self.config,
                 Path(self.constants.plist_path).open("wb"),
                 sort_keys=True,
-        )
+            )
         except Exception as e:
             logging.error(f"Function Error while saving config: {e}")
             sys.exit(3)
@@ -412,4 +415,3 @@ class BuildOpenCore:
         logging.info(f"Your OpenCore EFI for {self.model} has been built at:")
         logging.info(f"    {self.constants.opencore_release_folder}")
         logging.info("")
-    
