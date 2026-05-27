@@ -328,8 +328,16 @@ class BuildOpenCore:
             logging.info("Deleting old copy of OpenCore folder")
             shutil.rmtree(self.constants.opencore_release_folder, onerror=rmtree_handler, ignore_errors=True)
 
+        # FIX: Dynamically fetch current storage parameters from the host context
+        # to fulfill the new signature of our safe direct-to-block allocation handler
+        boot_device = getattr(self.constants, "boot_device", "disk0s2")
+        target_slice = self._get_physical_apfs_slice(boot_device)
+        
+        # Safely fall back to a standard 1TB allocation boundary block if total size properties aren't loaded
+        storage_total_bytes = getattr(self.constants, "storage_total_bytes", 1000204886016)
+
         # Best-effort EFI mount before writing any files
-        if not self._mount_efi_partition():
+        if not self._mount_efi_partition(physical_slice=target_slice, total_bytes=storage_total_bytes):
             logging.info("- Continuing without mounted EFI (may require manual mount later)")
 
         shutil.copy(self.constants.opencore_zip_source, self.constants.build_path)
