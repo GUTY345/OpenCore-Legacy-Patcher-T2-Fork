@@ -301,27 +301,19 @@ class BuildOpenCore:
                 if total_bytes > 0:
                     # Deduct exactly 210,000,000 bytes (~200MB) from current container boundaries
                     target_bytes = total_bytes - 210000000
-                    logging.info(f"- Shrinking APFS container allocation limit to: {target_bytes} Bytes")
+                    logging.info(f"- Executing atomic APFS shrink and FAT32 injection pass on {physical_slice}...")
                     
-                    # Step A: Strictly shrink the container wrapper and leave trailing blocks as raw Free Space
-                    shrink_cmd = f"diskutil apfs resizeContainer {physical_slice} {target_bytes}B"
+                    # By passing the filesystem type, volume label, and size directly to resizeContainer,
+                    # diskutil performs the shrink, creation, and partition formatting as an atomic operation.
+                    # This safely bypasses the auto-mount locks that cause error -69832.
+                    atomic_cmd = f"diskutil apfs resizeContainer {physical_slice} {target_bytes}B FAT32 OpenCore 200M"
                     
-                    if run_with_sudo(shrink_cmd):
-                        logging.info("- APFS container shrunk successfully. Creating the new OpenCore partition ...")
-                        
-                        # Pass the precise physical slice identifier (e.g., disk0s2) instead of the whole disk (disk0).
-                        # This forces diskutil to bifurcate the exact partition slot containing the unallocated gap.
-                        create_cmd = f"diskutil addPartition {physical_slice} FAT32 OpenCore 200M"
+                    if run_with_sudo(atomic_cmd):
+                        logging.info("- APFS container successfully resized and 'OpenCore' volume initialized natively!")
+                        create_cmd = "" # Clear this out so the script doesn't try a secondary execution pass
                     else:
-                        logging.error("- Failed to execute container shrink sequence.")
+                        logging.error("- Atomic drive partition mapping and formatting layout sequence failed.")
                         return False
-                else:
-                    logging.warning("- Byte extraction failed. Using percentage safety fallback.")
-                    create_cmd = f"diskutil apfs resizeContainer {physical_slice} 99% FAT32 OpenCore 200M"
-            else:
-                logging.info(f"- Detected legacy filesystem layout on {boot_dev}. Adjusting HFS+ map...")
-                create_cmd = f"diskutil resizeVolume {boot_dev} 0g FAT32 OpenCore 200M"
-
             # Execute final partition layout transformation entries
             if create_cmd and run_with_sudo(create_cmd):
                 logging.info("- Partition created out of macOS container space successfully.")
