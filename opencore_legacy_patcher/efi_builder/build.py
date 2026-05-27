@@ -210,11 +210,13 @@ class BuildOpenCore:
             self.config["Misc"]["BlessOverride"].append("\\EFI\\Microsoft\\Boot\\bootmgfw.efi")
     
     
+    Python
     def _mount_efi_partition(self) -> bool:
         """
         Locate and mount the custom 'OpenCore' partition. 
-        If missing, extracts the exact byte size directly from the physical APFS slice plist,
-        deducts 210MB, and forces an absolute byte contraction to carve out the partition.
+        If missing, extracts the physical slice size via a universal plist,
+        shrinks the APFS container to create unallocated free space, and then
+        initializes the FAT32 partition to bypass file system formatter bugs.
         """
         import subprocess
         import logging
@@ -283,6 +285,7 @@ class BuildOpenCore:
                 logging.error("- Could not pinpoint the primary boot disk identifier.")
                 return False
 
+            create_cmd = ""
             if "APFS" in info_root:
                 physical_slice = self._get_physical_apfs_slice(boot_dev)
                 total_bytes = 0
@@ -291,8 +294,6 @@ class BuildOpenCore:
                     # Query the physical slice directly (e.g., disk0s2)
                     slice_plist_raw = subprocess.check_output(["diskutil", "info", "-plist", physical_slice])
                     slice_data = plistlib.loads(slice_plist_raw)
-                    
-                    # The 'Size' key is the standard, un-nested byte integer for any physical disk slice
                     total_bytes = slice_data.get("Size", 0)
                     logging.info(f"- Successfully extracted physical slice size: {total_bytes} Bytes")
                 except Exception as plist_err:
@@ -301,21 +302,35 @@ class BuildOpenCore:
                 if total_bytes > 0:
                     # Deduct exactly 210,000,000 bytes (~200MB) from current container boundaries
                     target_bytes = total_bytes - 210000000
-                    logging.info(f"- Forcing absolute container contraction target to: {target_bytes} Bytes")
-                    create_cmd = f"diskutil apfs resizeContainer {physical_slice} {target_bytes}B FAT32 OpenCore 200M"
+                    logging.info(f"- Shrinking APFS container allocation limit to: {target_bytes} Bytes")
+                    
+                    # Step A: Strictly shrink the container wrapper and leave trailing blocks as raw Free Space
+                    shrink_cmd = f"diskutil apfs resizeContainer {physical_slice} {target_bytes}B"
+                    
+                    if run_with_sudo(shrink_cmd):
+                        logging.info("- APFS container shrunk successfully. Formatter bypass initializing...")
+                        
+                        # Isolate the parent physical disk identifier (e.g., disk0s2 -> disk0)
+                        parent_disk = physical_slice.split("s")[0] if "s" in physical_slice else "disk0"
+                        
+                        # Step B: Turn that newly created free space into our target FAT32 volume
+                        create_cmd = f"diskutil addPartition {parent_disk} FAT32 OpenCore 0"
+                    else:
+                        logging.error("- Failed to execute container shrink sequence.")
+                        return False
                 else:
-                    logging.warning("- Byte extraction failed. Using 99% hardcoded fallback string to avoid '0' loop.")
+                    logging.warning("- Byte extraction failed. Using percentage safety fallback.")
                     create_cmd = f"diskutil apfs resizeContainer {physical_slice} 99% FAT32 OpenCore 200M"
             else:
                 logging.info(f"- Detected legacy filesystem layout on {boot_dev}. Adjusting HFS+ map...")
                 create_cmd = f"diskutil resizeVolume {boot_dev} 0g FAT32 OpenCore 200M"
 
-            # Execute partition layout transformation entries
-            if run_with_sudo(create_cmd):
+            # Execute final partition layout transformation entries
+            if create_cmd and run_with_sudo(create_cmd):
                 logging.info("- Partition created out of macOS container space successfully.")
                 return True
             else:
-                logging.error("- Failed to resize drive map and allocate OpenCore partition.")
+                logging.error("- Failed to finalize drive formatting structures.")
                 return False
 
         except Exception as e:
