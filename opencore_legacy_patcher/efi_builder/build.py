@@ -307,16 +307,11 @@ class BuildOpenCore:
                     shrink_cmd = f"diskutil apfs resizeContainer {physical_slice} {target_bytes}B"
                     
                     if run_with_sudo(shrink_cmd):
-                        logging.info("- APFS container shrunk successfully. Formatter bypass initializing...")
+                        logging.info("- APFS container shrunk successfully. Creating the new OpenCore partition ...")
                         
-                        # Isolate the parent physical disk identifier using regex to avoid "di" slicing errors
-                        disk_match = re.match(r"^(disk\d+)", physical_slice)
-                        parent_disk = disk_match.group(1) if disk_match else "disk0"
-                        
-                        # Step B: Turn that newly created free space into our target FAT32 volume.
-                        # Explicitly defining "200M" here prevents diskutil from attempting to swallow
-                        # subsequent Bootcamp/Windows partitions down-drive when hitting multi-boot layouts.
-                        create_cmd = f"diskutil addPartition {parent_disk} FAT32 OpenCore 200M"
+                        # Pass the precise physical slice identifier (e.g., disk0s2) instead of the whole disk (disk0).
+                        # This forces diskutil to bifurcate the exact partition slot containing the unallocated gap.
+                        create_cmd = f"diskutil addPartition {physical_slice} FAT32 OpenCore 200M"
                     else:
                         logging.error("- Failed to execute container shrink sequence.")
                         return False
