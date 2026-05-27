@@ -213,9 +213,8 @@ class BuildOpenCore:
     def _mount_efi_partition(self) -> bool:
         """
         Locate and mount the custom 'OpenCore' partition. 
-        If missing, translates the physical APFS slice to its synthesized container ID,
-        extracts its exact byte capacity via plist, and shrinks the container by 
-        exactly 210MB to clear room for the new FAT32 partition.
+        If missing, extracts the exact byte size directly from the physical APFS slice plist,
+        deducts 210MB, and forces an absolute byte contraction to carve out the partition.
         """
         import subprocess
         import logging
@@ -289,29 +288,24 @@ class BuildOpenCore:
                 total_bytes = 0
                 
                 try:
-                    # Query the physical slice first to resolve the synthesized container identifier
+                    # Query the physical slice directly (e.g., disk0s2)
                     slice_plist_raw = subprocess.check_output(["diskutil", "info", "-plist", physical_slice])
                     slice_data = plistlib.loads(slice_plist_raw)
-                    container_id = slice_data.get("APFSContainerReference", "")
                     
-                    if container_id:
-                        logging.info(f"- Resolved synthesized APFS Container ID: {container_id}")
-                        # Now query the actual container disk to get the true byte capacity
-                        container_plist_raw = subprocess.check_output(["diskutil", "info", "-plist", container_id])
-                        container_data = plistlib.loads(container_plist_raw)
-                        total_bytes = container_data.get("APFSContainerTotalSpace", 0)
+                    # The 'Size' key is the standard, un-nested byte integer for any physical disk slice
+                    total_bytes = slice_data.get("Size", 0)
+                    logging.info(f"- Successfully extracted physical slice size: {total_bytes} Bytes")
                 except Exception as plist_err:
                     logging.warning(f"- Plist structural parsing failed: {plist_err}")
 
                 if total_bytes > 0:
                     # Deduct exactly 210,000,000 bytes (~200MB) from current container boundaries
                     target_bytes = total_bytes - 210000000
-                    logging.info(f"- Universal data parsed. Shrinking macOS container bounds strictly to: {target_bytes} Bytes")
+                    logging.info(f"- Forcing absolute container contraction target to: {target_bytes} Bytes")
                     create_cmd = f"diskutil apfs resizeContainer {physical_slice} {target_bytes}B FAT32 OpenCore 200M"
                 else:
-                    # Safer fallback string than percentages if byte extraction completely fails
-                    logging.warning("- Falling back to alternative delta compression parameters.")
-                    create_cmd = f"diskutil apfs resizeContainer {physical_slice} 0 FAT32 OpenCore 200M"
+                    logging.warning("- Byte extraction failed. Using 99% hardcoded fallback string to avoid '0' loop.")
+                    create_cmd = f"diskutil apfs resizeContainer {physical_slice} 99% FAT32 OpenCore 200M"
             else:
                 logging.info(f"- Detected legacy filesystem layout on {boot_dev}. Adjusting HFS+ map...")
                 create_cmd = f"diskutil resizeVolume {boot_dev} 0g FAT32 OpenCore 200M"
