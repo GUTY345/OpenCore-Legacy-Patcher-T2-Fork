@@ -223,13 +223,21 @@ class BuildOpenCore:
             target_bytes = total_bytes - 210000000
             logging.info("- Executing low-level container shrink pass...")
 
-            # Step 1: Shrink the container alone.
+            # Step 1: Shrink the container alone using an integrated elevated wrapper.
             shrink_cmd = f"diskutil apfs resizeContainer {physical_slice} {target_bytes}B"
-            if not run_with_sudo(shrink_cmd):
-                logging.error("- Failed to execute background container shrink sequence.")
+            logging.info(f"- Running privileged container shrink via: {shrink_cmd}")
+            
+            shrink_wrapper = [
+                "osascript", "-e",
+                f'do shell script "{shrink_cmd}" with administrator privileges'
+            ]
+            
+            shrink_run = subprocess.run(shrink_wrapper, capture_output=True, text=True)
+            if shrink_run.returncode != 0:
+                logging.error(f"- Failed to execute background container shrink sequence: {shrink_run.stderr.strip()}")
                 return False
 
-            logging.info("- Container shrunk. Slicing raw partition map...")
+            logging.info("- Container shrunk successfully. Slicing raw partition map...")
 
             # Isolate parent disk and identify target map parameters
             disk_match = re.match(r"^(disk\d+)", physical_slice)
