@@ -300,7 +300,7 @@ class BuildSecurity:
             kernel_patches.append({
                 "Arch": "x86_64",
                 "Comment": "Increase T2 USB Timeout (UI Stall fix)",
-                "Enabled": True,
+                "Enabled": False,
                 "Identifier": "com.apple.driver.usb.AppleUSBXHCI",
                 "Find": binascii.unhexlify("BA0A000000"),
                 "Replace": binascii.unhexlify("BAFF000000"),
