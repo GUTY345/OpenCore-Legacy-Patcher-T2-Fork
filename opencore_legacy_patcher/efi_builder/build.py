@@ -17,6 +17,7 @@ from datetime import date
 from .. import constants
 
 from ..support import utilities
+from ..datasets import model_array
 
 from .networking import (
 wired,
