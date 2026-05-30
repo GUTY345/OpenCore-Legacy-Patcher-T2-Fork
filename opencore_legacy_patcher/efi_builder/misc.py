@@ -420,6 +420,7 @@ class BuildMiscellaneous:
             ("WhateverGreen.kext", self.constants.whatevergreen_version, self.constants.whatevergreen_path),
             ("CryptexFixup.kext", "1.0.5", self.constants.kexts_path),
             ("AMFIPass.kext", "1.4.1", self.constants.kexts_path)
+            ("VirtualSMC.kext", "1.3.7", self.constants.kexts_path)
         ]:
             obj = builder.get_kext_by_bundle_path(kext)
             if not obj or obj.get("Enabled") is not True:
