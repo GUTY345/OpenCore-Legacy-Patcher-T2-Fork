@@ -192,8 +192,8 @@ class BuildSecurity:
             logging.error("Failed to discover the PCI path for the iGPU.")
             logging.info("It may be because discovery is not supported for this model or bugs in the code.")
             logging.info("Don't worry, we'll fall back to hardcoded PCI path for the iGPU.")
-            logging.info("However, there are risks of your system to kernel panic if the PCI path of your iGPU doesn't match the PciRoot(0x0)/Pci(0x2,0x0) iGPU path.")
-            # Fallback to standard if discovery is not supported on this model
+            logging.info("However, there are risks of your system to kernel panic if the PCI path of your iGPU doesn't match the PciRoot(0x0)/Pci(0x2,0x0) path.")
+            # Fallback to hardcoded PCI path if discovery is not supported on this model
             return "PciRoot(0x0)/Pci(0x2,0x0)"
 
     # ------------------------------------------------------------------
@@ -234,7 +234,7 @@ class BuildSecurity:
 
     def _apply_t2_graphics_injection(self) -> None:
         """Inject connector-less Intel iGPU DeviceProperties for T2 Macs."""
-        if self._should_skip_t2_graphics_injection():
+        if self._should_skip_t2_graphics_injection() or not self._requires_t2_graphics_injection():
             logging.info(f"- Skipping Intel graphics injection for {self.model} (no iGPU or not required)")
             return
 
