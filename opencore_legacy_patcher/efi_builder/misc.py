@@ -26,7 +26,7 @@ _T2_MODELS = {
     "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4",
     "MacBookPro16,1", "MacBookPro16,3", "MacBookPro16,4",
     "Macmini8,1",
-    "iMac19,1", "iMac19,2", "iMac20,1", "iMac20,2",
+    "iMac20,1", "iMac20,2",
     "iMacPro1,1",
 }
 
