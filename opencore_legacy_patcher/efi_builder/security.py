@@ -258,10 +258,13 @@ class BuildSecurity:
             logging.info("  > Added igfxgl=1 igfxmetal=1 (UHD617 grey screen fix)")
 
         # ── UHD 630 (Coffee Lake GT2, 0x3E9B) ────────────────────────────
-        else:
+        elif self.model in _T2_UHD630_MODELS:
             logging.info(f"- {self.model}: Injecting connector-less UHD630 DeviceProperties (Tahoe fix)")
             gfx["AAPL,ig-platform-id"] = binascii.unhexlify("06009B3E")  # 0x3E9B0006 LE
             gfx["device-id"]           = binascii.unhexlify("9B3E0000")  # 0x3E9B0000 LE
+        else:
+            logging.error("No available patches for your GPU, so likely only common framebuffer patches are required.")
+            logging.info("Continuing with common framebuffer patches only.")
 
         # ── Common framebuffer patches (all T2 iGPU models) ──────────────
         gfx["framebuffer-patch-enable"] = binascii.unhexlify("01000000")
