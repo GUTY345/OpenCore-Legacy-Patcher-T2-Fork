@@ -263,8 +263,8 @@ class BuildSecurity:
             gfx["AAPL,ig-platform-id"] = binascii.unhexlify("06009B3E")  # 0x3E9B0006 LE
             gfx["device-id"]           = binascii.unhexlify("9B3E0000")  # 0x3E9B0000 LE
         else:
-            logging.error("No available patches for your GPU, so likely only common framebuffer patches are required.")
-            logging.info("Continuing with common framebuffer patches only.")
+            logging.error(f"FATAL: Model {self.model} lacks specific GPU patch data.")
+            return
 
         # ── Common framebuffer patches (all T2 iGPU models) ──────────────
         gfx["framebuffer-patch-enable"] = binascii.unhexlify("01000000")
