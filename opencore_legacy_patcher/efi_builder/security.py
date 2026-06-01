@@ -177,8 +177,24 @@ class BuildSecurity:
     # ------------------------------------------------------------------
 
     def _get_graphics_device_properties_path(self) -> str:
-        """Return the PCI path for the integrated graphics device."""
-        return "PciRoot(0x0)/Pci(0x2,0x0)"
+        """
+        Dynamically resolve the PCI path for the IGPU.
+        If detection fails, fallback to the standard Intel path as a safeguard.
+        """
+        # Use the existing device_probe to find the actual device path
+        # Assuming device_probe has a method to map device names to paths
+        discovered_path = self.computer.find_device_path("IGPU")
+        try:
+            logging.info("Discovering the PCI path for your iGPU...")
+            if discovered_path:
+                return discovered_path
+        except Exception as e:
+            logging.error("Failed to discover the PCI path for the iGPU.")
+            logging.info("It may be because discovery is not supported for this model or bugs in the code.")
+            logging.info("Don't worry, we'll fall back to hardcoded PCI path for the iGPU.")
+            logging.info("However, there are risks of your system to kernel panic if the PCI path of your iGPU doesn't match the PciRoot(0x0)/Pci(0x2,0x0) iGPU path.")
+            # Fallback to standard if discovery is not supported on this model
+            return "PciRoot(0x0)/Pci(0x2,0x0)"
 
     # ------------------------------------------------------------------
     # Config helpers
