@@ -130,7 +130,7 @@ class BuildFrame(wx.Frame):
             )
             dialog.SetYesNoLabels("Install to disk", "View build log")
     
-            self.on_install() if dialog.ShowModal() == wx.ID_YES else self.install_button.Enable()
+        self.on_install() if dialog.ShowModal() == wx.ID_YES else self.install_button.Enable()
 
 
     def _build(self) -> None:
