@@ -9,6 +9,7 @@ import traceback
 import time
 import webbrowser
 import wx.html2
+import markdown2
 import urllib.parse
 
 from .. import constants
