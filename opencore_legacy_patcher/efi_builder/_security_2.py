@@ -106,26 +106,27 @@ class BuildSecurity:
                 self._set_nested_config_value(key, value)
 
     def _apply_t2_graphics_injection(self) -> None:
-        """Inject graphics DeviceProperties for supported Intel iGPU T2 Macs."""
+        """Inject graphics DeviceProperties using dynamic path discovery."""
         if self.model in _T2_UHD630_MODELS:
-             logging.info(f"- T2 {self.model} detected: Injecting connector-less UHD Graphics 630 properties")
+            # Call the dynamic discovery method
+            graphics_path = self._get_graphics_device_properties_path()
         
-            if "DeviceProperties" not in self.config:
-                self.config["DeviceProperties"] = {"Add": {}}
-            if "Add" not in self.config["DeviceProperties"]:
-                self.config["DeviceProperties"]["Add"] = {}
+            logging.info(f"- T2 {self.model} detected: Injecting connector-less UHD Graphics 630 properties at {graphics_path}")
+        
+            # Ensure the required configuration tree exists
+            self.config.setdefault("DeviceProperties", {}).setdefault("Add", {})
             
-            graphics_path = "PciRoot(0x0)/Pci(0x2,0x0)"
+            # Apply injection to the resolved dynamic path
             if graphics_path not in self.config["DeviceProperties"]["Add"]:
                 self.config["DeviceProperties"]["Add"][graphics_path] = {}
             
             gfx = self.config["DeviceProperties"]["Add"][graphics_path]
-            
-            # Fixed Byte Alignment to structural Little Endian for OpenCore parsing correctness
-            gfx["AAPL,ig-platform-id"]     = binascii.unhexlify("06009B3E")  # 0x3E9B0006
-            gfx["device-id"]               = binascii.unhexlify("9B3E0000")  # 0x3E9B0000
+        
+            # Inject properties
+            gfx["AAPL,ig-platform-id"]      = binascii.unhexlify("06009B3E")
+            gfx["device-id"]                = binascii.unhexlify("9B3E0000")
             gfx["framebuffer-patch-enable"] = binascii.unhexlify("01000000")
-            
+        
             logging.info("  > Graphics DeviceProperties injection complete (Little Endian verified)")
         else:
             logging.info(f"- Skipping Intel UHD Graphics 630 injection for {self.model}")
