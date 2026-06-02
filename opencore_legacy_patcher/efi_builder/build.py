@@ -242,7 +242,10 @@ class BuildOpenCore:
             rev["Build-Type"] = "OpenCore Built on Target Machine"
             computer_copy = copy.copy(self.constants.computer)
             computer_copy.ioregistry = None
-            rev["Hardware-Probe"] = pickle.dumps(computer_copy)
+            
+            # FIX: Convert the binary pickle dump to a string representation 
+            # so plistlib doesn't try to parse it as an active data structure.
+            rev["Hardware-Probe"] = str(pickle.dumps(computer_copy))
         else:
             rev["Build-Type"] = "OpenCore Built for External Machine"
     
@@ -262,7 +265,7 @@ class BuildOpenCore:
         # Validate type to avoid malicious plist poisoning
         if not isinstance(guid, dict):
             logging.error(f"NVRAM GUID {guid_key} is not a dictionary — refusing to write metadata")
-            logging.exception("Stack Trace:") # This prints the full technical error
+            logging.exception("Stack Trace:") 
             return
     
         # --- Safe writes ---
