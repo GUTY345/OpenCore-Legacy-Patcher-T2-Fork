@@ -423,7 +423,7 @@ class BuildMiscellaneous:
         ]:
             obj = builder.get_kext_by_bundle_path(kext)
             if not obj or obj.get("Enabled") is not True:
-                logging.info("---OpenCore Legacy Patcher T2---")
+                logging.info("---OpenCore Legacy Patcher T2 by Albert Müller---")
                 logging.info(f"- Enabling {kext}")
                 builder.enable_kext(kext, ver, path)
 
