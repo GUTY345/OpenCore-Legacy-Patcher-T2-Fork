@@ -84,13 +84,7 @@ class BuildFrame(wx.Frame):
         dlg.ShowModal()
         dlg.Destroy()
 
-
-    def on_ask_gemini(self) -> None:
-        dlg = wx.Dialog(self, title="Ask Gemini Analysis", size=(800, 600))
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        
-        webview = wx.html2.WebView.New(dlg)
-        
+    def copy_to_clipboard(self) -> None:
         # 1. Get the error log
         log_content = self.text_box.GetValue().splitlines()[-15:]
         error_text = "Analyze this OpenCore build error: " + " ".join(log_content)
@@ -112,6 +106,14 @@ class BuildFrame(wx.Frame):
             "Ask Gemini", 
             wx.OK | wx.ICON_INFORMATION
         )
+        
+    def on_ask_gemini(self) -> None:
+        copy_to_clipboard(self)
+        dlg = wx.Dialog(self, title="Ask Gemini Analysis", size=(800, 600))
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        webview = wx.html2.WebView.New(dlg)
+        
     
         webview.Bind(wx.html2.EVT_WEBVIEW_LOADED, on_load)
         webview.LoadURL("https://gemini.google.com/")
