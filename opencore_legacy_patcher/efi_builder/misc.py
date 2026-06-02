@@ -409,6 +409,7 @@ class BuildMiscellaneous:
 
     def _t2_handling(self) -> None:
         """T2 Security Chip Handler."""
+        logging.info("---OpenCore Legacy Patcher T2---")
         if not self._is_t2_mac():
             return
 
