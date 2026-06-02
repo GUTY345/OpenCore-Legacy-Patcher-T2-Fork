@@ -214,20 +214,35 @@ class BuildOpenCore:
         self.config = plistlib.load(Path(self.constants.plist_path).open("rb"))
     
     def _save_config(self) -> None:
-        """
-        Save config.plist to disk
-        """
+        """Save config.plist to disk with resource safety."""
+        
+        # 1. Ensure the directory exists before opening
         try:
-            plistlib.dump(
-                self.config,
-                Path(self.constants.plist_path).open("wb"),
-                sort_keys=True,
-        )
+            output_path = Path(self.constants.plist_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            logging.error(f"Function Error while saving config: {e}")
-            logging.exception("Stack Trace:") # This prints the full technical error
-            logging.info("Please try again later.")
-            sys.exit(3)
+            logging.error(f"Dictionary does not exist: {e}")
+            logging.exception("Stack Trace:")
+            raise # Re-raise or handle gracefully
+        
+        try:
+            # 2. Use a context manager to ensure the file is flushed and closed
+            with output_path.open("wb") as f:
+                plistlib.dump(self.config, f, sort_keys=True)
+            logging.info(f"Successfully saved configuration to {output_path}")
+            
+        except TypeError as e:
+            # 3. Specifically catch the 'keys must be strings' error
+            logging.error("CRITICAL: Failed to save config.plist due to non-string keys.")
+            logging.error(f"Error details: {e}")
+            logging.exception("Stack Trace:")
+            # Here, you would trigger your diagnostic tool to print the dictionary keys
+            raise  # Re-raise or handle gracefully
+        
+    except Exception as e:
+        logging.error(f"Function Error while saving config: {e}")
+        logging.exception("Stack Trace:")
+        sys.exit(3)
 
     def _set_revision(self) -> None:
         """
