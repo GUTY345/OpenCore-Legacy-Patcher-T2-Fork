@@ -179,18 +179,19 @@ class BuildSecurity:
     def _get_graphics_device_properties_path(self) -> str:
         """
         Dynamically resolve the PCI path for the IGPU.
-        If detection fails, fallback to the standard Intel path as a safeguard.
         """
-        # Use the existing device_probe to find the actual device path
-        # Assuming device_probe has a method to map device names to paths
         logging.info("Attempting to dynamically discover iGPU PCI path...")
         try:
             if hasattr(self.computer, "pci_devices"):
                 for path, device_info in self.computer.pci_devices.items():
-                    # Check for Display Controller class and ensure it is the Intel IGPU
-                    # We look for the class identifier and verify it is an Intel device
                     if device_info.get("class") == "0x030000" and "Intel" in device_info.get("vendor", ""):
                         return path
+            
+            # --- FIX: Explicitly return fallback if loop finishes without returning ---
+            logging.warning("iGPU PCI path not found via discovery, using fallback.")
+            logging.info("However, there are risks of your system to kernel panic if the PCI path of your iGPU doesn't match the PciRoot(0x0)/Pci(0x2,0x0) path.")
+            return "PciRoot(0x0)/Pci(0x2,0x0)"
+
         except Exception as e:
             logging.error("Failed to dynamically discover the PCI path for the iGPU.")
             logging.info("It may be because discovery is not supported for this model or bugs in the code.")
