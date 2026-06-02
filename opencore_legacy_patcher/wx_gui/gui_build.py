@@ -114,8 +114,9 @@ class BuildFrame(wx.Frame):
         
         webview = wx.html2.WebView.New(dlg)
         
-    
-        webview.Bind(wx.html2.EVT_WEBVIEW_LOADED, on_load)
+        # REMOVE OR COMMENT OUT THIS LINE:
+        # webview.Bind(wx.html2.EVT_WEBVIEW_LOADED, on_load)
+        
         webview.LoadURL("https://gemini.google.com/")
         
         sizer.Add(webview, 1, wx.EXPAND)
