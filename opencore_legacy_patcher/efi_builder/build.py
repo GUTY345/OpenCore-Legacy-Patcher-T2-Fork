@@ -70,7 +70,7 @@ class BuildOpenCore:
         """
         Build EFI folder
         """
-
+        logging.info("---OpenCore Legacy Patcher T2---")
         utilities.cls()
         logging.info(f"Building Configuration {'for external' if self.constants.custom_model else 'on model'}: {self.model}")
 
