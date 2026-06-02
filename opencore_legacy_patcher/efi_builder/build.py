@@ -239,10 +239,10 @@ class BuildOpenCore:
             # Here, you would trigger your diagnostic tool to print the dictionary keys
             raise  # Re-raise or handle gracefully
         
-    except Exception as e:
-        logging.error(f"Function Error while saving config: {e}")
-        logging.exception("Stack Trace:")
-        sys.exit(3)
+        except Exception as e:
+            logging.error(f"Function Error while saving config: {e}")
+            logging.exception("Stack Trace:")
+            sys.exit(3)
 
     def _set_revision(self) -> None:
         """
