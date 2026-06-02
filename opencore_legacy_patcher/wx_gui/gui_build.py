@@ -84,7 +84,7 @@ class BuildFrame(wx.Frame):
         dlg.ShowModal()
         dlg.Destroy()
 
-    def copy_to_clipboard():
+    def copy_to_clipboard(self):
         # 1. Get the error log
         log_content = self.text_box.GetValue().splitlines()[-15:]
         error_text = "Analyze this OpenCore build error: " + " ".join(log_content)
