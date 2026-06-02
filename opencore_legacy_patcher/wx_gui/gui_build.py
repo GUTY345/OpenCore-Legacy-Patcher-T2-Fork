@@ -108,7 +108,7 @@ class BuildFrame(wx.Frame):
         )
         
     def on_ask_gemini(self) -> None:
-        copy_to_clipboard()
+        self.copy_to_clipboard()
         dlg = wx.Dialog(self, title="Ask Gemini Analysis", size=(800, 600))
         sizer = wx.BoxSizer(wx.VERTICAL)
         
