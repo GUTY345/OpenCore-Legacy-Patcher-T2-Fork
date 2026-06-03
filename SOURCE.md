@@ -12,7 +12,7 @@ For developers wishing to validate mainline changes, you may use this link: [GUI
 
 ## Getting Started
 
-To start, ensure you have Python 3.6 or newer installed. Additionally, ensure that it was downloaded from the official source, [python.org](https://www.python.org/downloads/macos/).
+To start, ensure you have Python 3.13.13 or newer installed. Additionally, ensure that it was downloaded from the official source, [python.org](https://www.python.org/downloads/macos/).
 
 * Python installations either preinstalled or provided with Xcode or the Xcode Command Line Tools are unsupported due to reliability issues.
 
@@ -22,7 +22,7 @@ Once Python is installed, open Terminal and run the following:
 # Move into a directory to store the project
 cd ~/Developer
 # Clone project
-git clone https://github.com/dortania/OpenCore-Legacy-Patcher
+git clone https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2
 # Move into Project directory
 cd ./OpenCore-Legacy-Patcher
 # Install Python dependencies used by the project
