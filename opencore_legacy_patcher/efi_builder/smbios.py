@@ -92,6 +92,7 @@ class BuildSMBIOS:
         # Guard clause to handle missing staged USB maps during cross-model spoofing
         if not target_path.exists():
             logging.info(f"- Staged map asset not found at {target_path}, skipping strip operation.")
+            logging.info("Don't worry, this means that no USB port mapping is being injected and as such nothing is available to strip.")
             return
 
         config = plistlib.load(target_path.open("rb"))
