@@ -87,7 +87,14 @@ class BuildSMBIOS:
             self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] += " -no_compat_check"
 
     def _strip_usb_map(self, map_path, model, spoofed_model, serial_settings):
-        config = plistlib.load(Path(map_path).open("rb"))
+        target_path = Path(map_path)
+        
+        # Guard clause to handle missing staged USB maps during cross-model spoofing
+        if not target_path.exists():
+            logging.info(f"- Staged map asset not found at {target_path}, skipping strip operation.")
+            return
+
+        config = plistlib.load(target_path.open("rb"))
         for entry in list(config["IOKitPersonalities_x86_64"]):
             if not entry.startswith(model):
                 config["IOKitPersonalities_x86_64"].pop(entry)
@@ -103,7 +110,7 @@ class BuildSMBIOS:
                             config["IOKitPersonalities_x86_64"][entry]["IONameMatch"] = "XHC1"
                 except KeyError:
                     continue
-        plistlib.dump(config, Path(map_path).open("wb"), sort_keys=True)
+        plistlib.dump(config, target_path.open("wb"), sort_keys=True)
 
     def set_smbios(self) -> None:
         """
