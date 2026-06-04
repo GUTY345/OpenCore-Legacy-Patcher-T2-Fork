@@ -5,6 +5,7 @@ graphics_audio.py: Class for handling Graphics and Audio Patches, invocation fro
 import shutil
 import logging
 import binascii
+import sys
 
 from pathlib import Path
 
