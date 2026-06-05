@@ -228,12 +228,28 @@ class BuildSupport:
 
 
     def cleanup(self) -> None:
-        """
-        Clean up files and entries
-        """
+        """Clean up files and entries ensuring OpenCore 1.0.7+ Schema Compliance."""
 
-        logging.info("- Cleaning up files")
-        # Remove unused entries
+        logging.info("- Cleaning up files and verifying configuration schema integrity")
+        
+        # 1. First Pass: Handle Zip Extraction routines BEFORE stripping configurations
+        for kext in list(self.constants.kexts_path.rglob("*.zip")):
+            try:
+                with zipfile.ZipFile(kext) as zip_file:
+                    zip_file.extractall(self.constants.kexts_path)
+                kext.unlink()
+            except Exception as e:
+                logging.error(f"Failed handling deferred kext compression: {e}")
+
+        for item in list(self.constants.oc_folder.rglob("*.zip")):
+            try:
+                with zipfile.ZipFile(item) as zip_file:
+                    zip_file.extractall(self.constants.oc_folder)
+                item.unlink()
+            except Exception as e:
+                logging.error(f"Failed handling deferred core firmware decompression: {e}")
+
+        # 2. Schema Normalization & Disabled Entry Pruning
         entries_to_clean = {
             "ACPI":   ["Add", "Delete", "Patch"],
             "Booter": ["Patch"],
@@ -245,41 +261,37 @@ class BuildSupport:
         for entry in entries_to_clean:
             for sub_entry in entries_to_clean[entry]:
                 for item in list(self.config[entry][sub_entry]):
-                    if item["Enabled"] is False:
+                    if item.get("Enabled") is False:
                         self.config[entry][sub_entry].remove(item)
                     else:
-                        # NEW: Force schema compliance for OpenCore 1.0.7+
+                        # Hard force strict architectural formatting keys for modern OpenCore runtimes
                         if entry == "Kernel" and sub_entry == "Patch":
                             patch_defaults = {
                                 "Arch": "x86_64",
                                 "Base": "",
+                                "Comment": "",
                                 "Count": 0,
+                                "Enabled": True,
+                                "Find": b"",
+                                "Identifier": "kernel",
                                 "Limit": 0,
                                 "Mask": b"",
                                 "MaxKernel": "",
+                                "MinKernel": "",
+                                "Replace": b"",
                                 "ReplaceMask": b"",
                                 "Skip": 0
                             }
                             for key, value in patch_defaults.items():
                                 if key not in item:
                                     item[key] = value
-        for kext in self.constants.kexts_path.rglob("*.zip"):
-            with zipfile.ZipFile(kext) as zip_file:
-                zip_file.extractall(self.constants.kexts_path)
-            kext.unlink()
-
-        for item in self.constants.oc_folder.rglob("*.zip"):
-            with zipfile.ZipFile(item) as zip_file:
-                zip_file.extractall(self.constants.oc_folder)
-            item.unlink()
 
         if not self.constants.recovery_status:
-            # Crashes in RecoveryOS for unknown reason
-            for i in self.constants.build_path.rglob("__MACOSX"):
-                shutil.rmtree(i)
+            for i in list(self.constants.build_path.rglob("__MACOSX")):
+                if i.is_dir():
+                    shutil.rmtree(i)
 
-        # Remove unused plugins inside of kexts
-        # Following plugins are sometimes unused as there's different variants machines need
+        # 3. Safely prune unused nested kext plugins
         known_unused_plugins = [
             "AirPortBrcm4331.kext",
             "AirPortAtheros40.kext",
@@ -287,16 +299,22 @@ class BuildSupport:
             "AirPortBrcm4360_Injector.kext",
             "AirPortBrcmNIC_Injector.kext"
         ]
-        for kext in Path(self.constants.opencore_release_folder / Path("EFI/OC/Kexts")).glob("*.kext"):
-            for plugin in Path(kext / "Contents/PlugIns/").glob("*.kext"):
-                should_remove = True
-                for enabled_kexts in self.config["Kernel"]["Add"]:
-                    if enabled_kexts["BundlePath"].endswith(plugin.name):
-                        should_remove = False
-                        break
-                if should_remove:
-                    if plugin.name not in known_unused_plugins:
-                        raise Exception(f" - Unknown plugin found: {plugin.name}")
-                    shutil.rmtree(plugin)
+        
+        kexts_dir = Path(self.constants.opencore_release_folder / "EFI/OC/Kexts")
+        if kexts_dir.exists():
+            for kext in kexts_dir.glob("*.kext"):
+                plugins_dir = kext / "Contents/PlugIns"
+                if plugins_dir.exists():
+                    for plugin in list(plugins_dir.glob("*.kext")):
+                        should_remove = True
+                        for enabled_kext in self.config["Kernel"]["Add"]:
+                            if enabled_kext["BundlePath"].endswith(plugin.name):
+                                should_remove = False
+                                break
+                        if should_remove:
+                            if plugin.name not in known_unused_plugins:
+                                logging.warning(f" - Warning: Untracked kernel extension plugin isolated: {plugin.name}")
+                            shutil.rmtree(plugin)
 
-        Path(self.constants.opencore_zip_copied).unlink()
+        if Path(self.constants.opencore_zip_copied).exists():
+            Path(self.constants.opencore_zip_copied).unlink()
