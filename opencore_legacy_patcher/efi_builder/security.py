@@ -411,6 +411,34 @@ class BuildSecurity:
                 "MinKernel": "25.0.0"
             })
 
+        # 6. Bypass corecrypto FIPS POST self-test on T2 Macs (Tahoe)
+        # WHY: On T2 Macs running macOS Tahoe, the FIPS Power-On Self-Test in
+        # com.apple.kec.corecrypto fails with error -2074 at _corecrypto_kext_start
+        # because the T2 chip's SEP (Secure Enclave Processor) is not accessible
+        # through the normal x86 path when booting via OpenCore.
+        # The FIPS POST calls into SEP hardware that is gated behind T2 firmware
+        # trust — which OpenCore's unsigned boot path cannot satisfy.
+        # This patch replaces the POST failure branch (je = jump if equal/zero,
+        # i.e. jump if POST failed) with a nop so boot continues regardless.
+        # The T2 chip itself still enforces cryptographic security independently.
+        if not patch_exists("Bypass corecrypto FIPS POST (T2 Tahoe fix)"):
+            logging.info("  > Adding corecrypto FIPS POST bypass patch (T2 Tahoe)")
+            kernel_patches.append({
+                "Arch": "x86_64",
+                "Comment": "Bypass corecrypto FIPS POST (T2 Tahoe fix)",
+                "Enabled": True,
+                "Identifier": "com.apple.kec.corecrypto",
+                # fips_post_failed check: test eax,eax / je <panic>
+                # 85 C0 = TEST EAX, EAX
+                # 0F 84 = JE (near, 4-byte offset) — jump to panic if POST failed
+                "Find":    binascii.unhexlify("85C00F84"),
+                "Replace": binascii.unhexlify("85C09090"),  # replace JE with NOP NOP
+                "Mask":    binascii.unhexlify("FFFFFFFF"),
+                "ReplaceMask": binascii.unhexlify("FFFFFFFF"),
+                "MinKernel": "25.0.0",
+                "MaxKernel": "25.99.99",
+                "Count": 1,
+        
         if self.model in _T2_TOUCH_BAR_MODELS:
             # 5. Patch AppleTouchBarHIDEventDriver
             if not patch_exists("Patch AppleTouchBarHIDEventDriver (Tahoe fix)"):
