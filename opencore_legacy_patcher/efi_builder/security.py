@@ -14,7 +14,6 @@ from ..support import utilities
 from ..detections import device_probe
 from ..datasets import (
     model_array,
-    security_fallback,
     smbios_data,
     os_data
 )
@@ -210,24 +209,7 @@ class BuildSecurity:
     # T2 security helpers
     # ------------------------------------------------------------------
 
-    def _get_t2_security_fallback(self) -> dict:
-        """Load T2 fallback security values from the external dataset."""
-        return security_fallback.get_security_fallback(self.model)
-
-    def _apply_t2_security_fallback(self, fallback: dict, apple_nvram_uuid: str) -> None:
-        """Apply fallback security settings for a T2 Mac."""
-        for key, value in fallback.items():
-            if key == "csr-active-config":
-                if isinstance(value, str):
-                    value = binascii.unhexlify(value)
-                self._set_nvram_value(apple_nvram_uuid, key, value, overwrite=True)
-            elif key == "boot-args":
-                if isinstance(value, list):
-                    value = " ".join(value)
-                self._update_nvram_string(apple_nvram_uuid, "boot-args", value)
-            else:
-                self._set_nested_config_value(key, value)
-
+    
     def _apply_t2_graphics_injection(self) -> None:
         """Inject connector-less Intel iGPU DeviceProperties for T2 Macs."""
         if self._should_skip_t2_graphics_injection() or not self._requires_t2_graphics_injection():
@@ -458,7 +440,6 @@ class BuildSecurity:
             logging.info("- T2 Mac detected — applying consolidated T2 security settings")
             
             # 1. Base initialization, overrides, graphics and kernel patches
-            self._apply_t2_security_fallback(self._get_t2_security_fallback(), APPLE_NVRAM_UUID)
             self._apply_t2_memory_descriptor_overrides(APPLE_NVRAM_UUID)
             self._apply_t2_graphics_injection()
             self._apply_t2_kernel_patches_tahoe()
