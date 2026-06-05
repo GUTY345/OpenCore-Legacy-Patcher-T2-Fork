@@ -293,7 +293,7 @@ class BuildSecurity:
         self._apply_t2_amfi_boot_args(apple_nvram_uuid)
         self._update_nvram_string(apple_nvram_uuid, "boot-args", "ipc_control_port_options=0 -v keepsyms=1 nvme_shutdown_timestamp=0")
 
-        if self.constants.detected_os >= os_data.os_data.tahoe
+        if self.constants.detected_os >= os_data.os_data.tahoe:
             is_tahoe_target=True
             self.apply_cryptex_patches()
         elif is_tahoe_target=False and self.constants.detected_os >= os_data.os_data.mojave and self.constants.detected_os < os_data.os_data.tahoe
