@@ -438,6 +438,7 @@ class BuildSecurity:
                 "MinKernel": "25.0.0",
                 "MaxKernel": "25.99.99",
                 "Count": 1,
+            })
         
         if self.model in _T2_TOUCH_BAR_MODELS:
             # 5. Patch AppleTouchBarHIDEventDriver
