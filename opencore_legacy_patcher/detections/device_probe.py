@@ -7,6 +7,8 @@ import itertools
 import subprocess
 import plistlib
 import hashlib
+import sys
+import logging
 
 from pathlib import Path
 from dataclasses import dataclass, field
