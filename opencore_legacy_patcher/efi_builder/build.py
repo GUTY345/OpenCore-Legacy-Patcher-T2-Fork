@@ -103,11 +103,11 @@ class BuildOpenCore:
                 self.config.setdefault("PlatformInfo", {})["UpdateSMBIOSMode"] = "Custom"
                 self.config.setdefault("Kernel", {}).setdefault("Quirks", {})["CustomSMBIOSGuid"] = True
                 self.config.setdefault("Misc", {}).setdefault("Security", {})["SecureBootModel"] = "Disabled"
-                except Exception as e:
-                    logging.error("Whoops, applying in-memory T2 booter and SMBIOS alignments failed because of the following error:")
-                    logging.exception("Stack Trace:")
-                    logging.info("Please try again later.")
-                    sys.exit(3)
+            except Exception as e:
+                logging.error("Whoops, applying in-memory T2 booter and SMBIOS alignments failed because of the following error:")
+                logging.exception("Stack Trace:")
+                logging.info("Please try again later.")
+                sys.exit(3)
 
                 logging.info("- Adding T2-specific bypass NVRAM variables")
                 
