@@ -7,6 +7,8 @@ import locale
 import logging
 import threading
 import webbrowser
+import sys
+import logging
 
 from pathlib import Path
 
