@@ -476,14 +476,24 @@ class BuildMiscellaneous:
         self._set_nvram_value(APPLE_NVRAM_UUID, "csr-active-config", binascii.unhexlify("03080000"), overwrite=True)
         
         # macOS 26 (Tahoe) XART Registration Failure Patch
-        if not any(p.get("Comment") == "Bypass XARTDisableLog constraints (Tahoe)" for p in self.config["Kernel"]["Patch"]):
-            logging.info("Enabling bypass XARTDisableLog constraints for macOS 26 Tahoe patches")
-            self.config["Kernel"]["Patch"].append({
+        # 5. Bypass XART duplicate scan and capacity limits to unblock boot and fix Disk Utility Error -69624 so the installer can actually begin installing macOS 26 Tahoe
+        if not patch_exists("Bypass XARTDisableLog constraints (Tahoe fix)"):
+            logging.info("  > Injecting AppleSEPManager validation bypass patch")
+            kernel_patches.append({
                 "Arch": "x86_64",
-                "Comment": "Bypass XARTDisableLog constraints (Tahoe)",
+                "Base": "",
+                "Comment": "Bypass XARTDisableLog constraints (Tahoe fix)",
+                "Count": 1,
                 "Enabled": True,
                 "Identifier": "com.apple.driver.AppleSEPManager",
-                "Find": b"\x39\x34\xD0\x74\x27\x48\xFF\xC2",
-                "Replace": b"\x39\x34\xD0\xEB\x0E\x48\xFF\xC2",
-                "MinKernel": "25.0.0"
+                # Matches: TEST RCX, RCX; JZ LAB_ffffff8001c485b9; XOR EDX, EDX
+                "Find": b"\x48\x85\xC9\x74\x1C\x31\xD2",
+                "Mask": b"",
+                "MaxKernel": "",
+                "MinKernel": "25.0.0",
+                # Replaces 31 D2 (XOR EDX, EDX) with EB 1A (JMP 85b9) to force successful registration
+                "Replace": b"\x48\x85\xC9\x74\x1C\xEB\x1A",
+                "ReplaceMask": b"",
+                "Limit": 0,
+                "Skip": 0
             })
