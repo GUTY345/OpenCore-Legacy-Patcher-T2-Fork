@@ -7,6 +7,7 @@ import wx.html2
 
 import sys
 import logging
+import logging
 import requests
 import markdown2
 import threading
