@@ -1,22 +1,152 @@
-1. Fixed: Local Crash-Log Manipulation Vulnerability
-The Vulnerability: In your original code, reading the log file via log_file.read_text() used no encoding parameter. On a local system, if a malicious local user or a rogue background process deliberately injected corrupted multi-byte sequences, zero-byte sequences, or a massive cluster of invalid Unicode codepoints into an application crash log path, it would consistently trigger an unhandled UnicodeDecodeError.
+"""
+analytics_handler.py: Analytics and Crash Reporting Handler
+"""
 
-The Exploit Scenario: By manipulating files at the destination path, a local actor could execute a local Denial of Service (DoS) against your error reporting pipeline. They could effectively block the patcher from reporting legitimate system crashes back to your server, keeping you blind to actual problems.
+import json
+import datetime
+import plistlib
+from pathlib import Path
 
-The Fix: Hardening the read command with strict encoding="utf-8" paired with errors="ignore". Any malicious sequence intended to choke the Python string decoder is silently stripped away, rendering the attack vector completely harmless.
+from .. import constants
+from . import (
+    network_handler,
+    global_settings
+)
 
-2. Fixed: State-Corruption and Typo Propagation
-The Vulnerability: In your original code's __init__ constructor, several critical operational variables (self.gpus, self.firmware, self.location, and self.data) were left entirely un-declared. Instead, they were dynamic, ad-hoc attributes declared mid-execution inside your private tracking helper (_generate_base_data()).
+DATE_FORMAT:      str = "%Y-%m-%d %H-%M-%S"
+ANALYTICS_SERVER: str = ""
+SITE_KEY:          str = ""
+CRASH_URL:          str = ANALYTICS_SERVER + "/crash"
 
-The Exploit/Risk Scenario: This pattern introduces a severe State Confusion vulnerability inside Python programs. If send_analytics() fails or is aborted prior to _generate_base_data() running completely, referencing those attributes anywhere else in your class throws an immediate AttributeError. Even worse, it exposes your telemetry script to typo propagation (where a misspelled tracking attribute silently initializes a completely new property instead of failing explicitly).
+VALID_ANALYTICS_ENTRIES: dict = {
+    'KEY':                 str,               # Prevent abuse (embedded at compile time)
+    'UNIQUE_IDENTITY':     str,               # Host's UUID as SHA1 hash
+    'APPLICATION_NAME':    str,               # ex. OpenCore Legacy Patcher
+    'APPLICATION_VERSION': str,               # ex. 0.2.0
+    'OS_VERSION':          str,               # ex. 10.15.7
+    'MODEL':               str,               # ex. MacBookPro11,5
+    'GPUS':                list,              # ex. ['Intel Iris Pro', 'AMD Radeon R9 M370X']
+    'FIRMWARE':            str,               # ex. APPLE
+    'LOCATION':            str,               # ex. 'US' (just broad region, don't need to be specific)
+    'TIMESTAMP':           datetime.datetime, # ex. 2021-09-01-12-00-00
+}
 
-The Fix: Strict initialization of all object states (list, str, dict) immediately upon creation inside the class constructor (__init__). The object state remains predictable and immutable across its entire operational lifespan.
+VALID_CRASH_ENTRIES: dict = {
+    'KEY':                 str,               # Prevent abuse (embedded at compile time)
+    'APPLICATION_VERSION': str,               # ex. 0.2.0
+    'APPLICATION_COMMIT':  str,               # ex. 0.2.0 or {commit hash if not a release}
+    'OS_VERSION':          str,               # ex. 10.15.7
+    'MODEL':               str,               # ex. MacBookPro11,5
+    'TIMESTAMP':           datetime.datetime, # ex. 2021-09-01-12-00-00
+    'CRASH_LOG':           str,               # ex. "This is a crash log"
+}
 
-3. Fixed: String Truncation Guard Failures (Out-of-Bounds Risks)
-The Logic Flaw: The parsing mechanism of git information in your crash reporter:
 
-Python
-commit_info = self.constants.commit_info[0].split("/")[-1] + "_" + self.constants.commit_info[1].split("T")[0] ...
-completely relies on your constants object populating arrays exactly as expected. If an unstable build, localized script error, or system update passes unexpected formats (like missing / or a missing T), string-splitting will silently fail or grab out-of-bounds array slots.
+class Analytics:
 
-The Fix: The updated logic isolates string slicing cleanly and protects the sequence inside a strict try/except Exception perimeter block. If local path structures or strings do not safely align with formatting, the app discards the routine cleanly instead of surfacing a fatal app-wide exception error.
+    def __init__(self, global_constants: constants.Constants) -> None:
+        self.constants: constants.Constants = global_constants
+        self.unique_identity = str(self.constants.computer.uuid_sha1)
+        self.application =     str("OpenCore Legacy Patcher")
+        self.version =         str(self.constants.patcher_version)
+        self.os =              str(self.constants.detected_os_version)
+        self.model =           str(self.constants.computer.real_model)
+        self.date =            str(datetime.datetime.now().strftime(DATE_FORMAT))
+        self.gpus: list = []
+        self.firmware: str = ""
+        self.location: str = ""
+        self.data: dict = {}
+
+
+    def send_analytics(self) -> None:
+        if global_settings.GlobalEnviromentSettings().read_property("DisableCrashAndAnalyticsReporting") is True:
+            return
+
+        self._generate_base_data()
+        self._post_analytics_data()
+
+
+    def send_crash_report(self, log_file: Path) -> None:
+        if not ANALYTICS_SERVER or not SITE_KEY:
+            return
+        if global_settings.GlobalEnviromentSettings().read_property("DisableCrashAndAnalyticsReporting") is True:
+            return
+        if not log_file.exists():
+            return
+        if self.constants.commit_info[0].startswith("refs/tags"):
+            # Avoid being overloaded with crash reports from stable release builds
+            return
+
+        # Safely assemble commit information string
+        commit_info = (
+            self.constants.commit_info[0].split("/")[-1] + "_" + 
+            self.constants.commit_info[1].split("T")[0] + "_" + 
+            self.constants.commit_info[2].split("/")[-1]
+        )
+
+        try:
+            # Fallback to errors="ignore" / utf-8 ensures parsing corrupted logs won't crash the handler
+            crash_log_contents = log_file.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            return
+
+        crash_data = {
+            "KEY":                  SITE_KEY,
+            "APPLICATION_VERSION": self.version,
+            "APPLICATION_COMMIT":  commit_info,
+            "OS_VERSION":          self.os,
+            "MODEL":               self.model,
+            "TIMESTAMP":           self.date,
+            "CRASH_LOG":           crash_log_contents
+        }
+
+        network_handler.NetworkUtilities().post(CRASH_URL, json=crash_data)
+
+
+    def _get_country(self) -> str:
+        # Get approximate country from .GlobalPreferences.plist safely
+        path = Path("/Library/Preferences/.GlobalPreferences.plist")
+        if not path.exists():
+            return "US"
+
+        try:
+            # Fixed Resource Leak: Using context manager to safely open and close file handle
+            with path.open("rb") as f:
+                result = plistlib.load(f)
+        except Exception: # Fixed Vulnerability: Removed bare except clause
+            return "US"
+
+        if not isinstance(result, dict) or "Country" not in result:
+            return "US"
+
+        return str(result["Country"])
+
+
+    def _generate_base_data(self) -> None:
+        self.gpus = [str(gpu.arch) for gpu in self.constants.computer.gpus]
+        self.firmware = str(self.constants.computer.firmware_vendor)
+        self.location = str(self._get_country())
+
+        # Fixed Bug: Keep data structure as a dictionary. 
+        # Passing a pre-stringified JSON object to `json=` parameters double-encodes it.
+        self.data = {
+            'KEY':                  SITE_KEY,
+            'UNIQUE_IDENTITY':      self.unique_identity,
+            'APPLICATION_NAME':     self.application,
+            'APPLICATION_VERSION':  self.version,
+            'OS_VERSION':           self.os,
+            'MODEL':                self.model,
+            'GPUS':                 self.gpus,
+            'FIRMWARE':             self.firmware,
+            'LOCATION':             self.location,
+            'TIMESTAMP':            self.date,
+        }
+
+
+    def _post_analytics_data(self) -> None:
+        # Post data to analytics server
+        if not ANALYTICS_SERVER or not SITE_KEY:
+            return
+        
+        # Dictionary structure is passed clean here; network helper manages serialization
+        network_handler.NetworkUtilities().post(ANALYTICS_SERVER, json=self.data)
