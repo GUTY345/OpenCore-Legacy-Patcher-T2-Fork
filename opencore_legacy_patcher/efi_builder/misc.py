@@ -475,14 +475,15 @@ class BuildMiscellaneous:
         logging.info("- Set SIP to 0x803")
         self._set_nvram_value(APPLE_NVRAM_UUID, "csr-active-config", binascii.unhexlify("03080000"), overwrite=True)
         
-        logging.info("- Enabling AppleSEPManager timeout panic patch for T2 Macs")
-        if not any(p.get("Comment") == "Prevent AppleSEPManager SEP timeout panic" for p in self.config["Kernel"]["Patch"]):
+        # macOS 26 (Tahoe) XART Registration Failure Patch
+        if not any(p.get("Comment") == "Bypass XARTDisableLog constraints (Tahoe)" for p in self.config["Kernel"]["Patch"]):
+            logging.info("Enabling bypass XARTDisableLog constraints for macOS 26 Tahoe patches")
             self.config["Kernel"]["Patch"].append({
                 "Arch": "x86_64",
-                "Comment": "Prevent AppleSEPManager SEP timeout panic",
+                "Comment": "Bypass XARTDisableLog constraints (Tahoe)",
                 "Enabled": True,
                 "Identifier": "com.apple.driver.AppleSEPManager",
-                "Find": b"\x48\x83\xBF\xB0\x03\x00\x00\x00\x75\x4F",
-                "Replace": b"\x48\x83\xBF\xB0\x03\x00\x00\x00\xEB\x4F",
-                "MinKernel": "24.0.0"
+                "Find": b"\x39\x34\xD0\x74\x27\x48\xFF\xC2",
+                "Replace": b"\x39\x34\xD0\xEB\x0E\x48\xFF\xC2",
+                "MinKernel": "25.0.0"
             })
