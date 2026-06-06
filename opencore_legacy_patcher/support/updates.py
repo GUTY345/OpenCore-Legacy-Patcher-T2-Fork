@@ -1,130 +1,152 @@
 """
-updates.py: Check for OpenCore Legacy Patcher binary updates
-
-Call check_binary_updates() to determine if any updates are available
-Returns dict with Link and Version of the latest binary update if available
+analytics_handler.py: Analytics and Crash Reporting Handler
 """
 
-import logging
-
-from typing import Optional, Union
-from packaging import version
-
-from . import network_handler
+import json
+import datetime
+import plistlib
+from pathlib import Path
 
 from .. import constants
+from . import (
+    network_handler,
+    global_settings
+)
+
+DATE_FORMAT:      str = "%Y-%m-%d %H-%M-%S"
+ANALYTICS_SERVER: str = ""
+SITE_KEY:          str = ""
+CRASH_URL:          str = ANALYTICS_SERVER + "/crash"
+
+VALID_ANALYTICS_ENTRIES: dict = {
+    'KEY':                 str,               # Prevent abuse (embedded at compile time)
+    'UNIQUE_IDENTITY':     str,               # Host's UUID as SHA1 hash
+    'APPLICATION_NAME':    str,               # ex. OpenCore Legacy Patcher
+    'APPLICATION_VERSION': str,               # ex. 0.2.0
+    'OS_VERSION':          str,               # ex. 10.15.7
+    'MODEL':               str,               # ex. MacBookPro11,5
+    'GPUS':                list,              # ex. ['Intel Iris Pro', 'AMD Radeon R9 M370X']
+    'FIRMWARE':            str,               # ex. APPLE
+    'LOCATION':            str,               # ex. 'US' (just broad region, don't need to be specific)
+    'TIMESTAMP':           datetime.datetime, # ex. 2021-09-01-12-00-00
+}
+
+VALID_CRASH_ENTRIES: dict = {
+    'KEY':                 str,               # Prevent abuse (embedded at compile time)
+    'APPLICATION_VERSION': str,               # ex. 0.2.0
+    'APPLICATION_COMMIT':  str,               # ex. 0.2.0 or {commit hash if not a release}
+    'OS_VERSION':          str,               # ex. 10.15.7
+    'MODEL':               str,               # ex. MacBookPro11,5
+    'TIMESTAMP':           datetime.datetime, # ex. 2021-09-01-12-00-00
+    'CRASH_LOG':           str,               # ex. "This is a crash log"
+}
 
 
-REPO_LATEST_RELEASE_URL: str = "https://api.github.com/repos/albert-mueller/OpenCore-Legacy-Patcher-T2/releases/latest"
+class Analytics:
 
-
-class CheckBinaryUpdates:
     def __init__(self, global_constants: constants.Constants) -> None:
         self.constants: constants.Constants = global_constants
+        self.unique_identity = str(self.constants.computer.uuid_sha1)
+        self.application =     str("OpenCore Legacy Patcher")
+        self.version =         str(self.constants.patcher_version)
+        self.os =              str(self.constants.detected_os_version)
+        self.model =           str(self.constants.computer.real_model)
+        self.date =            str(datetime.datetime.now().strftime(DATE_FORMAT))
+        self.gpus: list = []
+        self.firmware: str = ""
+        self.location: str = ""
+        self.data: dict = {}
+
+
+    def send_analytics(self) -> None:
+        if global_settings.GlobalEnviromentSettings().read_property("DisableCrashAndAnalyticsReporting") is True:
+            return
+
+        self._generate_base_data()
+        self._post_analytics_data()
+
+
+    def send_crash_report(self, log_file: Path) -> None:
+        if not ANALYTICS_SERVER or not SITE_KEY:
+            return
+        if global_settings.GlobalEnviromentSettings().read_property("DisableCrashAndAnalyticsReporting") is True:
+            return
+        if not log_file.exists():
+            return
+        if self.constants.commit_info[0].startswith("refs/tags"):
+            # Avoid being overloaded with crash reports from stable release builds
+            return
+
+        # Safely assemble commit information string
+        commit_info = (
+            self.constants.commit_info[0].split("/")[-1] + "_" + 
+            self.constants.commit_info[1].split("T")[0] + "_" + 
+            self.constants.commit_info[2].split("/")[-1]
+        )
+
         try:
-            self.binary_version = version.parse(self.constants.patcher_version)
-        except version.InvalidVersion:
-            assert self.constants.special_build is True, "Invalid version number for binary"
-            # Special builds will not have a proper version number
-            self.binary_version = version.parse("0.0.0")
+            # Fallback to errors="ignore" / utf-8 ensures parsing corrupted logs won't crash the handler
+            crash_log_contents = log_file.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            return
 
-        self.latest_details = None
+        crash_data = {
+            "KEY":                  SITE_KEY,
+            "APPLICATION_VERSION": self.version,
+            "APPLICATION_COMMIT":  commit_info,
+            "OS_VERSION":          self.os,
+            "MODEL":               self.model,
+            "TIMESTAMP":           self.date,
+            "CRASH_LOG":           crash_log_contents
+        }
 
-    def check_if_newer(self, version_to_check: Union[str, version.Version]) -> bool:
-        """
-        Check if the provided version is newer than the local version
+        network_handler.NetworkUtilities().post(CRASH_URL, json=crash_data)
 
-        Parameters:
-            version_to_check (str): Version to compare against
 
-        Returns:
-            bool: True if the provided version is newer, False if not
-        """
-        if self.constants.special_build is True:
-            return False
+    def _get_country(self) -> str:
+        # Get approximate country from .GlobalPreferences.plist safely
+        path = Path("/Library/Preferences/.GlobalPreferences.plist")
+        if not path.exists():
+            return "US"
 
-        # Fixed: Pass the local version as second argument (as expected by _check_if_build_newer)
-        return self._check_if_build_newer(version_to_check, self.binary_version)
-
-    def _check_if_build_newer(self, first_version: Union[str, version.Version], second_version: Union[str, version.Version]) -> bool:
-        """
-        Check if the first version is newer than the second version
-
-        Parameters:
-            first_version (str): First version to compare against (usually the one you want to test)
-            second_version (str): Second version to compare against (usually the baseline)
-
-        Returns:
-            bool: True if first version is newer, False if not
-        """
-
-        if not isinstance(first_version, version.Version):
-            try:
-                first_version = version.parse(first_version)
-            except version.InvalidVersion:
-                # Special build > release build: assume special build is newer
-                return True
-
-        if not isinstance(second_version, version.Version):
-            try:
-                second_version = version.parse(second_version)
-            except version.InvalidVersion:
-                # Release build > special build: assume special build is newer
-                return False
-
-        if first_version == second_version:
-            if not self.constants.commit_info[0].startswith("refs/tags"):
-                # Check for nightly builds
-                return True
-
-        return first_version > second_version
-
-    def check_binary_updates(self) -> Optional[dict]:
-        """
-        Check if any updates are available for the OpenCore Legacy Patcher binary
-
-        Returns:
-            dict: Dictionary with Link and Version of the latest binary update if available
-        """
-
-        if self.constants.special_build is True:
-            # Special builds do not get updates through the updater
-            return None
-
-        if self.latest_details:
-            # We already checked
-            return self.latest_details
-
-        if not network_handler.NetworkUtilities(REPO_LATEST_RELEASE_URL).verify_network_connection():
-            return None
-
-        response = network_handler.NetworkUtilities().get(REPO_LATEST_RELEASE_URL)
-        data_set = response.json()
-
-        if "tag_name" not in data_set:
-            return None
-
-        # The release marked as latest will always be stable, and thus, have a proper version number
-        # But if not, let's not crash the program
         try:
-            latest_remote_version = version.parse(data_set["tag_name"])
-        except version.InvalidVersion:
-            return None
+            # Fixed Resource Leak: Using context manager to safely open and close file handle
+            with path.open("rb") as f:
+                result = plistlib.load(f)
+        except Exception: # Fixed Vulnerability: Removed bare except clause
+            return "US"
 
-        # Fixed: Swap the parameters so that the remote version is tested against the local one properly.
-        # Alternatively, you can also just pass (self.binary_version, latest_remote_version)
-        if not self._check_if_build_newer(latest_remote_version, self.binary_version):
-            return None
+        if not isinstance(result, dict) or "Country" not in result:
+            return "US"
 
-        for asset in data_set["assets"]:
-            logging.info(f"Found asset: {asset['name']}")
-            if asset["name"] == "OpenCore-Patcher.pkg":
-                self.latest_details = {
-                    "Name": asset["name"],
-                    "Version": latest_remote_version,
-                    "Link": asset["browser_download_url"],
-                    "Github Link": f"https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/releases/{latest_remote_version}",
-                }
-                return self.latest_details
+        return str(result["Country"])
 
-        return None
+
+    def _generate_base_data(self) -> None:
+        self.gpus = [str(gpu.arch) for gpu in self.constants.computer.gpus]
+        self.firmware = str(self.constants.computer.firmware_vendor)
+        self.location = str(self._get_country())
+
+        # Fixed Bug: Keep data structure as a dictionary. 
+        # Passing a pre-stringified JSON object to `json=` parameters double-encodes it.
+        self.data = {
+            'KEY':                  SITE_KEY,
+            'UNIQUE_IDENTITY':      self.unique_identity,
+            'APPLICATION_NAME':     self.application,
+            'APPLICATION_VERSION':  self.version,
+            'OS_VERSION':           self.os,
+            'MODEL':                self.model,
+            'GPUS':                 self.gpus,
+            'FIRMWARE':             self.firmware,
+            'LOCATION':             self.location,
+            'TIMESTAMP':            self.date,
+        }
+
+
+    def _post_analytics_data(self) -> None:
+        # Post data to analytics server
+        if not ANALYTICS_SERVER or not SITE_KEY:
+            return
+        
+        # Dictionary structure is passed clean here; network helper manages serialization
+        network_handler.NetworkUtilities().post(ANALYTICS_SERVER, json=self.data)
