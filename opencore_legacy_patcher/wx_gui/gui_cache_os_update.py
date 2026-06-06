@@ -204,7 +204,7 @@ class OSUpdateFrame(wx.Frame):
         Display frame
 
 
-        Title: OpenCore Legacy Patcher is preparing to update your system
+        Title: OpenCore Legacy Patcher T2 is preparing to update your system
         Body:  Please wait while we prepare your system for the update.
                This may take a few minutes.
         """
@@ -244,7 +244,7 @@ class OSUpdateFrame(wx.Frame):
         """
         Notify user of what OCLP is doing
         """
-        message=f"OpenCore Legacy Patcher has detected that a macOS update is being downloaded:\n{self.os_data[0]} ({self.os_data[1]})\n\nThe patcher needs to prepare the system for the update, and will download any additional resources it may need post-update.\n\nThis may take a few minutes, the patcher will exit when it is done."
+        message=f"OpenCore Legacy Patcher T2 has detected that a macOS update is being downloaded:\n{self.os_data[0]} ({self.os_data[1]})\n\nThe patcher needs to prepare the system for the update, and will download any additional resources it may need post-update.\n\nThis may take a few minutes, the patcher will exit when it is done."
         # Yes/No for caching
         dlg = wx.MessageDialog(self.frame, message=message, caption="OpenCore Legacy Patcher", style=wx.YES_NO | wx.ICON_INFORMATION)
         dlg.SetYesNoLabels("&Ok", "&Cancel")
