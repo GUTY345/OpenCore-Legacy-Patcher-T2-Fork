@@ -5,6 +5,7 @@ dmg_mount.py: PatcherSupportPkg DMG Mounting. Handles Universal-Binaries and Dor
 import logging
 import subprocess
 import applescript
+import sys
 
 from pathlib import Path
 
