@@ -489,7 +489,7 @@ class BuildMiscellaneous:
         self.config.setdefault('Kernel', {}).setdefault('Patch', [])
         kernel_patches = self.config['Kernel']['Patch']
 
-        # Disable xART validation capacity loop checks safely (Fixes Disk Utility Error -69624)
+        # Disable xART validation capacity loop checks safely (Fixes kernel panics upon trying to boot macOS 26 Tahoe via OpenCore)
         if not any(p.get("Comment") == "Bypass XARTDisableLog limits (Tahoe Cache Fix)" for p in kernel_patches):
             logging.info("  > Injecting AppleSEPManager text segment check bypass into kernel cache")
             kernel_patches.append({
@@ -512,7 +512,7 @@ class BuildMiscellaneous:
                 "Skip": 0
             })
 
-        # 6. Force AppleSEPDeviceService OOL constraints (Fixes hardware channel allocation drops)
+        # Force AppleSEPDeviceService OOL constraints (Fixes hardware channel allocation drops)
         if not any(p.get("Comment") == "Hardcode SEP OOL Max Send Pages Limit" for p in kernel_patches):
             logging.info("  > Injecting AppleSEPDeviceService OOL payload bypass")
             kernel_patches.append({
@@ -534,30 +534,26 @@ class BuildMiscellaneous:
                 "Skip": 0
             })
 
-            
-        # 6. Bypass osinstallersetupd bridge device validation checks (Fixes Attestation Error -10000)
-
-        # AI-Generated patch, generated completely by Gemini; reverse engineering remains and correcting the code as well
-        # Bypass DeviceIdentity attestation loops (Fixes Failed to get bridge device / Error -10000)
-        # if not any(p.get("Comment") == "Bypass DeviceIdentity Attestation (Tahoe Fix)" for p in kernel_patches):
-            logging.info("  > Injecting DeviceIdentity attestation bypass")
+        # Disable AppleKeyStoreUserClient assertion deadline loops (Fixes Disk Utility Verification Hangs)
+        if not any(p.get("Comment") == "Bypass AppleKeyStore Deadline Mismatch" for p in kernel_patches):
+            logging.info("  > Injecting AppleKeyStoreUserClient operational state bypass")
             kernel_patches.append({
                 "Arch": "x86_64",
-                "Base": "",
-                "Comment": "Bypass DeviceIdentity Attestation (Tahoe Fix)",
+                "Base": "",  # Natural segment scan
+                "Comment": "Bypass AppleKeyStore Deadline Mismatch",
                 "Count": 1,
                 "Enabled": True,
-                # Force the global kernel cache parser to hook the security verification layer
-                "Identifier": "apple",
-                # Matches the underlying attestation constraint sequence inside the validation text segment
-                "Find": b"\x48\x85\xC0\x74\x05\xE8\x00\x00\x00\x00\x48\x8B",
-                "Mask": b"\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF",
+                # Scope strictly to AppleKeyStore to prevent false positives across the cache
+                "Identifier": "com.apple.driver.AppleKeyStore",
+                # Matches: MOV R15, qword ptr [RBX + 0x100]; SUB R15, R13; JBE LAB_ffffff8001a7a14f
+                "Find": b"\x4c\x8b\xbb\x00\x01\x00\x00\x4d\x29\xef\x0f\x86",
+                "Mask": b"",
                 "MaxKernel": "",
                 "MinKernel": "25.0.0",
-                # Forces the validation path to evaluate as successful, keeping the bridge channel open
-                "Replace": b"\x31\xC0\x40\x90\x90\xE8\x00\x00\x00\x00\x48\x8B",
-                "ReplaceMask": b"\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF",
+                # Replaces relative JBE (0F 86) with an absolute short jump or safe NOP sequence
+                # to prevent execution flow from dropping into the failure loop block.
+                "Replace": b"\x4c\x8b\xbb\x00\x01\x00\x00\x4d\x29\xef\x90\x90\x90\x90\x90\x90",
+                "ReplaceMask": b"",
                 "Limit": 0,
                 "Skip": 0
             })
-            
