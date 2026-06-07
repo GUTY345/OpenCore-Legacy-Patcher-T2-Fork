@@ -476,27 +476,27 @@ class BuildMiscellaneous:
         self._set_nvram_value(APPLE_NVRAM_UUID, "csr-active-config", binascii.unhexlify("03080000"), overwrite=True)
         
         # Allows booting macOS 26 Tahoe's installer via OpenCore on T2 Macs
-        # Bypass XART duplicate scan and capacity limits to unblock boot and fix Disk Utility Error -69624
         self.config.setdefault('Kernel', {}).setdefault('Patch', [])
         kernel_patches = self.config['Kernel']['Patch']
 
-        # Neutralize AppleSEPManager validation loop tracking completely (Fixes Error -69624)
-        if not any(p.get("Comment") == "Bypass XARTDisableLog constraints (Tahoe fix)" for p in kernel_patches):
-            logging.info("  > Injecting AppleSEPManager function return override")
+        # Disable xART validation capacity loop checks safely (Fixes Disk Utility Error -69624)
+        if not any(p.get("Comment") == "Bypass XARTDisableLog limits (Tahoe Cache Fix)" for p in kernel_patches):
+            logging.info("  > Injecting AppleSEPManager text segment check bypass into kernel cache")
             kernel_patches.append({
                 "Arch": "x86_64",
-                "Base": "",
-                "Comment": "Bypass XARTDisableLog constraints (Tahoe fix)",
+                "Base": "",  # Leave empty to scan the segment naturally
+                "Comment": "Bypass XARTDisableLog limits (Tahoe Cache Fix)",
                 "Count": 1,
                 "Enabled": True,
-                "Identifier": "com.apple.driver.AppleSEPManager",
-                # Matches uniquely at f8001c48584: PUSH RBP; MOV RBP, RSP; MOV RCX, qword ptr [this + 0x80]
-                "Find": b"\x55\x48\x89\xE5\x48\x8B\x8F\x80\x00\x00\x00",
+                # Force OpenCore to scan the global prelinked kernel cache pool
+                "Identifier": "apple",
+                # Matches exactly lines f8001c4858f and f8001c48593: CMP RCX, 0x10; JA LAB_ffffff8001c485fb
+                "Find": b"\x48\x83\xF9\x10\x77\x66",
                 "Mask": b"",
                 "MaxKernel": "",
                 "MinKernel": "25.0.0",
-                # Replaces with: XOR EAX, EAX; INC EAX; RET (returns 1 / success) followed by 7 NOPs (\x90) to match length
-                "Replace": b"\x31\xC0\x40\xC3\x90\x90\x90\x90\x90\x90\x90",
+                # Replaces JA (77 66) with two NOPs (90 90) so execution safely falls through 
+                "Replace": b"\x48\x83\xF9\x10\x90\x90",
                 "ReplaceMask": b"",
                 "Limit": 0,
                 "Skip": 0
