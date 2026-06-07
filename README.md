@@ -26,7 +26,7 @@ A Python-based project revolving around [Acidanthera's OpenCorePkg](https://gith
 - [X] Fix https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/25 
 - [X] Return support for MacBookAir8,1 and MacBookAir8,2
 - [X] Installer boots - only with alpha 14 (precompiled or source; it doesn't matter) and pre-alpha 10 (source code only; not released due to 3-6 models may panic plus weird APFS behavior on those who managed to boot the installer)
-- [ ] Internal hard drive mounts properly on T2 Macs
+- [ ] Internal hard drive mounts properly on T2 Macs - https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/69
 - [ ] Post-install + full OS usability
 
 
