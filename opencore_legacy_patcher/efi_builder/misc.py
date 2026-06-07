@@ -475,9 +475,11 @@ class BuildMiscellaneous:
         logging.info("- Set SIP to 0x803")
         self._set_nvram_value(APPLE_NVRAM_UUID, "csr-active-config", binascii.unhexlify("03080000"), overwrite=True)
         
-        # macOS 26 (Tahoe) XART Registration Failure Patch
-        # 5. Bypass XART duplicate scan and capacity limits to unblock boot and fix Disk Utility Error -69624 so the installer can actually begin installing macOS 26 Tahoe
-        if not patch_exists("Bypass XARTDisableLog constraints (Tahoe fix)"):
+        # 5. Bypass XART duplicate scan and capacity limits to unblock boot and fix Disk Utility Error -69624
+        self.config.setdefault('Kernel', {}).setdefault('Patch', [])
+        kernel_patches = self.config['Kernel']['Patch']
+
+        if not any(p.get("Comment") == "Bypass XARTDisableLog constraints (Tahoe fix)" for p in kernel_patches):
             logging.info("  > Injecting AppleSEPManager validation bypass patch")
             kernel_patches.append({
                 "Arch": "x86_64",
