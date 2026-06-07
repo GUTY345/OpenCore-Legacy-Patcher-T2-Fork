@@ -501,6 +501,30 @@ class BuildMiscellaneous:
                 "Limit": 0,
                 "Skip": 0
             })
+
+        # 6. Force AppleSEPDeviceService OOL constraints (Fixes hardware channel allocation drops)
+        if not any(p.get("Comment") == "Hardcode SEP OOL Max Send Pages Limit" for p in kernel_patches):
+            logging.info("  > Injecting AppleSEPDeviceService OOL payload bypass")
+            kernel_patches.append({
+                "Arch": "x86_64",
+                "Base": "",
+                "Comment": "Hardcode SEP OOL Max Send Pages Limit",
+                "Count": 1,
+                "Enabled": True,
+                "Identifier": "apple",
+                # Finds: MOV RAX, [RDI+0x88]; MOVZX EAX, byte ptr [RAX+0x6]; POP RBP; RET
+                "Find": b"\x48\x8b\x87\x88\x00\x00\x00\x0f\xb6\x40\x06\x5d\xc3",
+                "Mask": b"",
+                "MaxKernel": "",
+                "MinKernel": "25.0.0",
+                # Replaces with: MOV EAX, 0x40; NOP blocks; POP RBP; RET
+                "Replace": b"\xb8\x40\x00\x00\x00\x90\x90\x90\x90\x90\x90\x5d\xc3",
+                "ReplaceMask": b"",
+                "Limit": 0,
+                "Skip": 0
+            })
+
+            
         # 6. Bypass osinstallersetupd bridge device validation checks (Fixes Attestation Error -10000)
 
         # AI-Generated patch, generated completely by Gemini; reverse engineering remains and correcting the code as well
