@@ -457,7 +457,17 @@ class BuildMiscellaneous:
 
         APPLE_NVRAM_UUID = "7C436110-AB2A-4BBB-A880-FE41995C9F82"
         logging.info("- Skipping Language and Region selection (all T2 models)")
-        self._set_nvram_value(APPLE_NVRAM_UUID, "prev-lang:kbd", "en-US:0", overwrite=True)
+        
+        # 1. Format 'en-US:0' as a raw byte sequence terminated by a null byte or written as exact hex data
+        # In OpenCore config.plist, this must be represented as <656e2d55533a30> (en-US:0)
+        prev_lang_bytes = b"en-US:0"
+        
+        self._set_nvram_value(APPLE_NVRAM_UUID, "prev-lang:kbd", prev_lang_bytes, overwrite=True)
+        
+        # 2. Force the global language/locale environment variables to anchor the region
+        # This stops the setup subsystem from falling back to European/German region formats
+        self._set_nvram_value(APPLE_NVRAM_UUID, "AppleLanguages", ["en-US"], overwrite=True)
+        self._set_nvram_value(APPLE_NVRAM_UUID, "AppleLocale", "en_US", overwrite=True)
 
         logging.info("- Adding T2-specific boot arguments for macOS 15/26")
         self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-v rddelay=5 igfxfw=2 igfxonln=1 -disable_ext_panics -no_compat_check")
