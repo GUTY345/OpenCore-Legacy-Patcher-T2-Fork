@@ -475,12 +475,14 @@ class BuildMiscellaneous:
         logging.info("- Set SIP to 0x803")
         self._set_nvram_value(APPLE_NVRAM_UUID, "csr-active-config", binascii.unhexlify("03080000"), overwrite=True)
         
-        # 5. Bypass XART duplicate scan and capacity limits to unblock boot and fix Disk Utility Error -69624
+        # Allows booting macOS 26 Tahoe's installer via OpenCore on T2 Macs
+        # Bypass XART duplicate scan and capacity limits to unblock boot and fix Disk Utility Error -69624
         self.config.setdefault('Kernel', {}).setdefault('Patch', [])
         kernel_patches = self.config['Kernel']['Patch']
 
+        # Neutralize AppleSEPManager validation loop tracking completely (Fixes Error -69624)
         if not any(p.get("Comment") == "Bypass XARTDisableLog constraints (Tahoe fix)" for p in kernel_patches):
-            logging.info("  > Injecting AppleSEPManager validation bypass patch")
+            logging.info("  > Injecting AppleSEPManager function return override")
             kernel_patches.append({
                 "Arch": "x86_64",
                 "Base": "",
@@ -488,14 +490,15 @@ class BuildMiscellaneous:
                 "Count": 1,
                 "Enabled": True,
                 "Identifier": "com.apple.driver.AppleSEPManager",
-                # Matches: TEST RCX, RCX; JZ LAB_ffffff8001c485b9; XOR EDX, EDX
-                "Find": b"\x48\x85\xC9\x74\x1C\x31\xD2",
+                # Matches uniquely at f8001c48584: PUSH RBP; MOV RBP, RSP; MOV RCX, qword ptr [this + 0x80]
+                "Find": b"\x55\x48\x89\xE5\x48\x8B\x8F\x80\x00\x00\x00",
                 "Mask": b"",
                 "MaxKernel": "",
                 "MinKernel": "25.0.0",
-                # Replaces 31 D2 (XOR EDX, EDX) with EB 1A (JMP 85b9) to force successful registration
-                "Replace": b"\x48\x85\xC9\x74\x1C\xEB\x1A",
+                # Replaces with: XOR EAX, EAX; INC EAX; RET (returns 1 / success) followed by 7 NOPs (\x90) to match length
+                "Replace": b"\x31\xC0\x40\xC3\x90\x90\x90\x90\x90\x90\x90",
                 "ReplaceMask": b"",
                 "Limit": 0,
                 "Skip": 0
             })
+            
