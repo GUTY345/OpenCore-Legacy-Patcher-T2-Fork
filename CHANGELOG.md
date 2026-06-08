@@ -15,6 +15,7 @@ At this point, the user doesn't see Executing arbitary code, so the attackers ca
 - Fix a bug where cryptex=0 cs_allow_invalid=1 would not be injected if the user isn't running macOS 26 Tahoe but the user wants to install it
 -  Fix a bug where Macs with Iris Graphics Plus were getting patches for Intel UHD Graphics 617
 - Fix a bug where Macs with Amber Lake GPUs were getting Intel UHD Graphics 617
+- Newly untested patches from now on will be considered optional until tested and fully working. If the user wants to enable optional patches, the user will need to download the source code, open up misc.py and change this: enable_experimental_patches=False to True. This is a measure to prevent kernel panics because of untested/unverified patches.
 - Fix a bug where existing patches may get overwritten
 - Improve OpenCore 1.0.7 stability
 - Fixes a bug where macOS Recovery's language is setting back to the computer's language instead of English
@@ -157,6 +158,7 @@ Da der Benutzer die Meldung "Executing arbitary code" nicht sieht, können Angre
 - Ein Fehler wurde behoben, durch den vorhandene Patches überschrieben werden konnten.
 
 - Die Stabilität von OpenCore 1.0.7 wurde verbessert.
+- Neue, ungetestete Patches gelten ab sofort als optional, bis sie getestet und vollständig funktionsfähig sind. Um optionale Patches zu aktivieren, muss der Benutzer den Quellcode herunterladen, die Datei misc.py öffnen und die Zeile enable_experimental_patches=False in True ändern. Dies dient dazu, Kernel-Panics aufgrund ungetesteter/ungeprüfter Patches zu verhindern.
 
 - Ein Fehler wurde behoben, durch den die Sprache der macOS-Wiederherstellung auf die Systemsprache anstatt auf Englisch zurückgesetzt wurde.
 
