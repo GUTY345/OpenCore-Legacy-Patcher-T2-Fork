@@ -428,6 +428,7 @@ class BuildMiscellaneous:
 
         # Handle explicit performance/timeout panics on specific MacBook lines
         if self.model in ["MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1", "MacBookPro16,3"]:
+            # 2 andere zufällige KI-basierten patches
             logging.info(f"- {self.model}: Applying Unsupported Mantissa Speed kernel panic patches")
             m1 = builder.get_kext_by_bundle_path("USB-Map.kext")
             m2 = builder.get_kext_by_bundle_path("USB-Map-Tahoe.kext")
