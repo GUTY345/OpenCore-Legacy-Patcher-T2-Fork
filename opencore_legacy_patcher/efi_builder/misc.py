@@ -411,8 +411,7 @@ class BuildMiscellaneous:
         """T2 Security Chip Handler."""
         if not self._is_t2_mac():
             return
-        enable_experimental_patches=False
-
+        enable_experimental_patches=False #soll normalerweise dieser Funktion nicht True rückgeben, stattdessen wenn für experimentelle Zwecken verwenden soll, der Benutzer soll dies auf True korrigieren
         builder = support.BuildSupport(self.model, self.constants, self.config)
         self.config.setdefault("Kernel", {}).setdefault("Patch", [])
 
@@ -571,7 +570,7 @@ class BuildMiscellaneous:
         # aber momentan es mountet noch immer keine Partitionen
         # beim Herunterfahren des Installationsprogramm mit dieser Patch eingeschaltet den Mac zeigt einen Kernel Panic
         # 3. Bypass osinstallersetupd bridge device validation checks (Fixes Attestation Error -10000)
-        if enable_experimental_patches==True: #soll normalerweise dieser Funktion nicht True rückgeben, stattdessen wenn für experimentelle Zwecken verwenden soll, der Benutzer soll diese Überprüfungskondition entfernen
+        if enable_experimental_patches==True: #soll normalerweise dieser Funktion niemals True rückgeben, ohne dass der Benutzer selbst ins Code eingreift
             if not any(p.get("Comment") == "Bypass DeviceIdentity Attestation (Tahoe Fix)" for p in kernel_patches):
                 logging.info("  > Injecting DeviceIdentity attestation bypass into AppleSEPManager")
                 kernel_patches.append({
