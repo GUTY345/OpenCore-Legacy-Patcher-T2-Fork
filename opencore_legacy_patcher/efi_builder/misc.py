@@ -563,3 +563,31 @@ class BuildMiscellaneous:
                 "Limit": 0,
                 "Skip": 0
             })
+        # Gemini-generierten Patch, überprüfung erforderlich:
+        # bitte beachten Sie, dass dieser Patch noch nicht überprüft ist und kann Kernel Panic oder andere unerwünschte Verhalten verursachen
+        # Seien Sie momentan mit dieser Patch vorsichtig bevor sie es aktivieren
+        # 3. Bypass osinstallersetupd bridge device validation checks (Fixes Attestation Error -10000)
+        # if not any(p.get("Comment") == "Bypass DeviceIdentity Attestation (Tahoe Fix)" for p in kernel_patches):
+            logging.info("  > Injecting DeviceIdentity attestation bypass into AppleSEPManager")
+            kernel_patches.append({
+                "Arch": "x86_64",
+                "Base": "",
+                "Comment": "Bypass DeviceIdentity Attestation (Tahoe Fix)",
+                "Count": 1,
+                # Force this to True to clear the 'Failed to get bridge device' mount block
+                "Enabled": True, 
+                "Identifier": "com.apple.driver.AppleSEPManager",
+                # Matches the underlying attestation constraint sequence inside the validation text segment
+                "Find": b"\x48\x85\xC0\x74\x05\xE8\x00\x00\x00\x00\x48\x8B",
+                "Mask": b"\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF",
+                "MaxKernel": "",
+                "MinKernel": "25.0.0",
+                # Changes conditional jump JZ (74 05) to an unconditional short jump JMP (EB 05)
+                # Safely skips over the communication failure drop path entirely
+                "Replace": b"\x48\x85\xC0\xEB\x05\xE8\x00\x00\x00\x00\x48\x8B",
+                "ReplaceMask": b"\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF",
+                "Limit": 0,
+                "Skip": 0
+            })
+
+            
