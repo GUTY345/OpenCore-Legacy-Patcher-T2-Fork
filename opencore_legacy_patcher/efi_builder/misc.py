@@ -428,34 +428,39 @@ class BuildMiscellaneous:
 
         # Handle explicit performance/timeout panics on specific MacBook lines
         if self.model in ["MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1", "MacBookPro16,3"]:
-            # 2 andere zufällige KI-basierten patches
             logging.info(f"- {self.model}: Applying Unsupported Mantissa Speed kernel panic patches")
-            m1 = builder.get_kext_by_bundle_path("USB-Map.kext")
-            m2 = builder.get_kext_by_bundle_path("USB-Map-Tahoe.kext")
-            if m1: m1["Enabled"] = False
-            if m2: m2["Enabled"] = False
-
+            try:
+                logging.info(f"- {self.model}: Disabling USB-Map.kext and USB-Map-Tahoe.kext if any is there")
+                m1 = builder.get_kext_by_bundle_path("USB-Map.kext")
+                m2 = builder.get_kext_by_bundle_path("USB-Map-Tahoe.kext")
+                if m1: m1["Enabled"] = False
+                if m2: m2["Enabled"] = False
+            except Exception as e:
+                logging.info(f"- {self.model}: Great news! We tried disabling USB-Map.kext and USN-Map-Tahoe.kext but we didn't found them.")
+                logging.info("You don't have to worry about this message.")
+            logging.info("Enabling AppleUSBHostPort patches")
             self.config["Kernel"]["Patch"].extend([
                 {
                     "Arch": "x86_64",
-                    "Comment": "Disable AppleUSBHostPort power state timeout",
+                    "Comment": "Bypass AppleUSBHostPort PowerFloorSession initialization (C1)",
                     "Enabled": True,
-                    "Identifier": "com.apple.driver.AppleUSBHostPort",
-                    "Find": b"\x48\x85\xC0\x74\x08\x48\x8B\x00\x48\x8B\x40\x28\xFF\xE0",
-                    "Replace": b"\xEB\x0C\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90",
+                    "Identifier": "com.apple.iokit.IOUSBHostFamily",
+                    "Base": "__ZN16AppleUSBHostPort26IOUSBPortPowerFloorSessionC1EPS_",
+                    "Find": b"",  # Dynamically resolved by OpenCore's linker parser
+                    "Replace": b"\xC3",  # ret (Immediately returns, bypassing virtual JMP)
                     "MinKernel": "24.0.0"
                 },
                 {
                     "Arch": "x86_64",
-                    "Comment": "Patch AppleUSBVHCI to skip transition timeout",
+                    "Comment": "Bypass AppleUSBHostPort PowerFloorSession initialization (C2)",
                     "Enabled": True,
-                    "Identifier": "com.apple.driver.AppleUSBVHCI",
-                    "Find": b"\x48\x8B\x05\x00\x00\x00\x00\x48\x8D\x0D\x00\x00\x00\x00\x41\xBB\x01\x00\x00\x00",
-                    "Replace": b"\x48\x8B\x05\x00\x00\x00\x00\x48\x8D\x0D\x00\x00\x00\x00\x41\xBB\x00\x00\x00\x00",
+                    "Identifier": "com.apple.iokit.IOUSBHostFamily",
+                    "Base": "__ZN16AppleUSBHostPort26IOUSBPortPowerFloorSessionC2EPS_",
+                    "Find": b"",
+                    "Replace": b"\xC3",  # ret
                     "MinKernel": "24.0.0"
                 }
             ])
-
         APPLE_NVRAM_UUID = "7C436110-AB2A-4BBB-A880-FE41995C9F82"
         logging.info("- Skipping Language and Region selection (all T2 models)")
         
