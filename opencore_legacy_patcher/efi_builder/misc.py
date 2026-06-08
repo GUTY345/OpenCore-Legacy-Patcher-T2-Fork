@@ -571,8 +571,8 @@ class BuildMiscellaneous:
         # beim Herunterfahren des Installationsprogramm mit dieser Patch eingeschaltet den Mac zeigt einen Kernel Panic
         # 3. Bypass osinstallersetupd bridge device validation checks (Fixes Attestation Error -10000)
         # if not any(p.get("Comment") == "Bypass DeviceIdentity Attestation (Tahoe Fix)" for p in kernel_patches):
-            logging.info("  > Injecting DeviceIdentity attestation bypass into AppleSEPManager")
-            kernel_patches.append({
+            # logging.info("  > Injecting DeviceIdentity attestation bypass into AppleSEPManager")
+            # kernel_patches.append({
                 "Arch": "x86_64",
                 "Base": "",
                 "Comment": "Bypass DeviceIdentity Attestation (Tahoe Fix)",
