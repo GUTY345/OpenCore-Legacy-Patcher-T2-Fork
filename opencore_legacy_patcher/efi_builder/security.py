@@ -410,8 +410,10 @@ class BuildSecurity:
             })
         
         if self.model in _T2_TOUCH_BAR_MODELS:
-            logging.info("No touch bar patches available for now. Don't worry - your system should boot.")
+            logging.info("No touch bar patches available for now. Don't worry - your system should boot anyways.")
+            logging.info("If it doesn't, please open an issue about the kernel panic that appears on your screen.")
             logging.info("Keine Touch Bar Patches sind verfügbar. Macht euch keine Sorge - das System soll trotzdem starten.")
+            logging.info("Falls den Mac gar nicht hochfährt und stattdessen einen Kernel Panic zeigt, Sie müssen das Problem melden.")
     
         """Injects corecrypto binary shims to bypass FIPS Kernel POST verification failures."""
         logging.info("- Injecting corecrypto FIPS POST binary shims for Tahoe targets")
