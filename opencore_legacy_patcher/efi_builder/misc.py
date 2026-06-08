@@ -566,6 +566,7 @@ class BuildMiscellaneous:
         # Gemini-generierten Patch, überprüfung erforderlich:
         # bitte beachten Sie, dass dieser Patch noch nicht überprüft ist und kann Kernel Panic oder andere unerwünschte Verhalten verursachen
         # Seien Sie momentan mit dieser Patch vorsichtig bevor sie es aktivieren
+        # Dieser Patch soll einen Fehler beheben, indem die interne Festplatte gar nicht APFS-Partitionen außer Macintosh HD mountet
         # 3. Bypass osinstallersetupd bridge device validation checks (Fixes Attestation Error -10000)
         # if not any(p.get("Comment") == "Bypass DeviceIdentity Attestation (Tahoe Fix)" for p in kernel_patches):
             logging.info("  > Injecting DeviceIdentity attestation bypass into AppleSEPManager")
