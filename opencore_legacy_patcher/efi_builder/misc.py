@@ -551,14 +551,14 @@ class BuildMiscellaneous:
                 "Enabled": True,
                 # Scope strictly to AppleKeyStore to prevent false positives across the cache
                 "Identifier": "com.apple.driver.AppleKeyStore",
-                # Matches: MOV R15, qword ptr [RBX + 0x100]; SUB R15, R13; JBE LAB_ffffff8001a7a14f
+                # Matches: MOV R15, qword ptr [RBX + 0x100]; SUB R15, R13; JBE LAB_ffffff8001a7a14f (12 bytes)
                 "Find": b"\x4c\x8b\xbb\x00\x01\x00\x00\x4d\x29\xef\x0f\x86",
                 "Mask": b"",
                 "MaxKernel": "",
                 "MinKernel": "25.0.0",
-                # Replaces relative JBE (0F 86) with an absolute short jump or safe NOP sequence
-                # to prevent execution flow from dropping into the failure loop block.
-                "Replace": b"\x4c\x8b\xbb\x00\x01\x00\x00\x4d\x29\xef\x90\x90\x90\x90\x90\x90",
+                # REMOVED: 4 trailing NOPs (\x90) so length exactly matches 'Find' (12 bytes)
+                # This safely neutralizes the first two bytes of the JBE conditional branch
+                "Replace": b"\x4c\x8b\xbb\x00\x01\x00\x00\x4d\x29\xef\x90\x90",
                 "ReplaceMask": b"",
                 "Limit": 0,
                 "Skip": 0
