@@ -817,7 +817,7 @@ class SettingsFrame(wx.Frame):
                     "variable": "IgnoreAppUpdates",
                     "constants_variable": "ignore_updates",
                     "description": [
-                        "This disables OpenCore Legacy Patcher T2 updates.",
+                        f"This disables {self.constants.patcher_name} updates.",
                         "Not recommended as disabling app updates makes",
                         "you vulnerable to newly discovered vulnerabilities that",
                         "have been already patched."
@@ -1056,7 +1056,7 @@ class SettingsFrame(wx.Frame):
                 break
 
             lines = f"""Application Information:
-        Application Version: {self.constants.patcher_version}
+        Application Version: {self.constants.patcher_version_label}
         PatcherSupportPkg Version: {self.constants.patcher_support_pkg_version}
         Application Path: {self.constants.launcher_binary}
         Application Mount: {self.constants.payload_path}

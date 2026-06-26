@@ -31,12 +31,12 @@ class AboutFrame(wx.Frame):
     def _generate_elements(self, frame: wx.Frame) -> None:
 
         # Set title
-        title = wx.StaticText(frame, label="OpenCore Legacy Patcher T2", pos=(-1, 5))
+        title = wx.StaticText(frame, label=self.constants.patcher_name, pos=(-1, 5))
         title.SetFont(gui_support.font_factory(19, wx.FONTWEIGHT_BOLD))
         title.Centre(wx.HORIZONTAL)
 
         # Set version
-        version = wx.StaticText(frame, label=f"Version: {self.constants.patcher_version}", pos=(-1, title.GetPosition()[1] + title.GetSize()[1] + 5))
+        version = wx.StaticText(frame, label=f"Version: {self.constants.patcher_version_label}", pos=(-1, title.GetPosition()[1] + title.GetSize()[1] + 5))
         version.SetFont(gui_support.font_factory(11, wx.FONTWEIGHT_NORMAL))
         version.Centre(wx.HORIZONTAL)
 

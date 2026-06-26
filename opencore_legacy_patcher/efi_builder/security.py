@@ -147,6 +147,8 @@ class BuildSecurity:
 
     def _requires_t2_graphics_injection(self) -> bool:
         """Return True if this T2 model needs Intel graphics injection."""
+        if self.model == "MacBookPro15,1":
+            return False
         return (self.model in _T2_UHD630_MODELS or self.model in _T2_LOW_POWER_MODELS or self.model in _T2_IRIS_PLUS_MODELS)
 
     def _should_skip_t2_graphics_injection(self) -> bool:
@@ -159,6 +161,10 @@ class BuildSecurity:
 
     def _apply_t2_amfi_boot_args(self, apple_nvram_uuid: str) -> None:
         """Apply AMFI-related boot-args based on user path validation."""
+        if self.model == "MacBookPro15,1":
+            logging.info("  > MacBookPro15,1: Skipping AMFIPass boot-arg while isolating persistent IOBufferCopyController bridge timeout.")
+            return
+
         if self._t2_uses_amfipass():
             logging.info("  > T2 target utilizes AMFIPass layer. Ensuring -amfipassbeta presence.")
             self._update_nvram_string(apple_nvram_uuid, "boot-args", "-amfipassbeta")
@@ -212,6 +218,10 @@ class BuildSecurity:
     
     def _apply_t2_graphics_injection(self) -> None:
         """Inject connector-less Intel iGPU DeviceProperties for T2 Macs."""
+        if self.model == "MacBookPro15,1":
+            logging.info(f"- {self.model}: Skipping Intel graphics DeviceProperties while isolating persistent IOBufferCopyController bridge timeout.")
+            return
+
         if self._should_skip_t2_graphics_injection() or not self._requires_t2_graphics_injection():
             logging.info(f"- Skipping Intel graphics injection for {self.model} (no iGPU or not required)")
             return
@@ -270,13 +280,21 @@ class BuildSecurity:
         self.config["Misc"]["Security"]["ApECID"]          = int(0)
 
         if self.model == "MacBookPro15,1":
-            logging.info("  > Forcing Native SMBIOS (MacBookPro15,1) to prevent Trust Cache mismatch")
-            for section in ["Generic", "SMBIOS", "DataHub"]:
-                if section in self.config.get("PlatformInfo", {}):
-                    self.config["PlatformInfo"][section]["SystemProductName"] = "MacBookPro15,1"
+            logging.info("  > MacBookPro15,1: Aligning installer identity with Tahoe 26.2 PlatformSupport (MacBookPro16,4/J215).")
+            platform_info = self.config.setdefault("PlatformInfo", {})
+            platform_info.setdefault("Generic", {})["SystemProductName"] = "MacBookPro16,4"
+            platform_info.setdefault("DataHub", {})["SystemProductName"] = "MacBookPro16,4"
+            platform_info["DataHub"]["BoardProduct"] = "Mac-A61BADE1FDAD7B05"
+            platform_info.setdefault("SMBIOS", {})["SystemProductName"] = "MacBookPro16,4"
+            platform_info["SMBIOS"]["BoardProduct"] = "Mac-A61BADE1FDAD7B05"
+            platform_info.setdefault("PlatformNVRAM", {})["BID"] = "Mac-A61BADE1FDAD7B05"
 
         self._apply_t2_amfi_boot_args(apple_nvram_uuid)
-        self._update_nvram_string(apple_nvram_uuid, "boot-args", "ipc_control_port_options=0 -v keepsyms=1 nvme_shutdown_timestamp=0")
+        if self.model == "MacBookPro15,1":
+            logging.info("  > MacBookPro15,1: Using minimal T2 debug boot-args while isolating persistent IOBufferCopyController bridge timeout.")
+            self._update_nvram_string(apple_nvram_uuid, "boot-args", "-v keepsyms=1")
+        else:
+            self._update_nvram_string(apple_nvram_uuid, "boot-args", "ipc_control_port_options=0 -v keepsyms=1 nvme_shutdown_timestamp=0")
 
         if self.constants.detected_os >= os_data.os_data.tahoe:
             self.is_tahoe_target = True
@@ -342,6 +360,30 @@ class BuildSecurity:
             # Crucial: Unblock the worker thread regardless of dialog outcome or failures
             event.set()
 
+    def _unknown_target_cli(self, apple_nvram_uuid: str) -> None:
+        """Prompt for the target OS when building from a non-GUI CLI session."""
+        logging.info("Select target OS for this T2 OpenCore build:")
+        logging.info("  1. macOS 26 Tahoe or newer")
+        logging.info("  2. macOS 15 Sequoia or older")
+
+        while True:
+            try:
+                selection = input("Target OS [1/2]: ").strip()
+            except EOFError as e:
+                raise RuntimeError("Unable to determine target OS in CLI mode without input.") from e
+
+            if selection == "1":
+                logging.info("CLI Selection: macOS 26 Tahoe target path validated.")
+                self.is_tahoe_target = True
+                self._apply_cryptex_patches(apple_nvram_uuid)
+                return
+            if selection == "2":
+                logging.info("CLI Selection: Skipping Tahoe-specific patches (Sequoia or older).")
+                self.is_tahoe_target = False
+                return
+
+            logging.info("Please enter 1 for Tahoe or 2 for Sequoia or older.")
+
     def _handle_selection(self, dialog: wx.Dialog, apple_nvram_uuid: str, target_is_tahoe: bool) -> None:
         """Consolidated callback processor for wxButton events."""
         if target_is_tahoe:
@@ -373,41 +415,44 @@ class BuildSecurity:
         def patch_exists(comment: str) -> bool:
             return any(p.get("Comment") == comment for p in kernel_patches)
 
-        # 1. Bypass AppleIntelUSBXHCI T2 handshake
-        if not patch_exists("Bypass T2 USB handshake (Tahoe fix)"):
-            kernel_patches.append({
-                "Arch": "x86_64",
-                "Comment": "Bypass T2 USB handshake (Tahoe fix)",
-                "Enabled": True,
-                "Identifier": "com.apple.driver.usb.AppleUSBXHCI",
-                # Matches: MOV RAX, qword ptr [RBX]; MOV RDI, RBX; CALL qword ptr [RAX + 0x38]
-                "Find": binascii.unhexlify("488B034889DFFF5038"),
-                "Mask": b"", # Exact binary instruction match; no wildcards needed
-                "MaxKernel": "",
-                "MinKernel": "25.0.0",
-                # Replaces 'FF 50 38' (CALL) with '31C090' (XOR EAX,EAX; NOP) to force return code 0 (Success)
-                "Replace": binascii.unhexlify("488B034889DF31C090"),
-                "ReplaceMask": b"",
-                "Skip": 0
-            })
+        if self.model == "MacBookPro15,1":
+            logging.info("- Skipping AppleUSBXHCI binary patches on MacBookPro15,1; latest panic backtrace is inside AppleUSBXHCI command ring power-state handling.")
+        else:
+            # 1. Bypass AppleIntelUSBXHCI T2 handshake
+            if not patch_exists("Bypass T2 USB handshake (Tahoe fix)"):
+                kernel_patches.append({
+                    "Arch": "x86_64",
+                    "Comment": "Bypass T2 USB handshake (Tahoe fix)",
+                    "Enabled": True,
+                    "Identifier": "com.apple.driver.usb.AppleUSBXHCI",
+                    # Matches: MOV RAX, qword ptr [RBX]; MOV RDI, RBX; CALL qword ptr [RAX + 0x38]
+                    "Find": binascii.unhexlify("488B034889DFFF5038"),
+                    "Mask": b"", # Exact binary instruction match; no wildcards needed
+                    "MaxKernel": "",
+                    "MinKernel": "25.0.0",
+                    # Replaces 'FF 50 38' (CALL) with '31C090' (XOR EAX,EAX; NOP) to force return code 0 (Success)
+                    "Replace": binascii.unhexlify("488B034889DF31C090"),
+                    "ReplaceMask": b"",
+                    "Skip": 0
+                })
 
-        # 3. Bypass InternalHubPowerCheck
-        if not patch_exists("Bypass InternalHubPowerCheck (Tahoe fix)"):
-            kernel_patches.append({
-                "Arch": "x86_64",
-                "Comment": "Bypass InternalHubPowerCheck via getUpstreamHub (Tahoe fix)",
-                "Enabled": True,
-                "Identifier": "com.apple.driver.usb.AppleUSBXHCI",
-                # Matches: PUSH RBP; MOV RBP, RSP; MOV RAX, qword ptr [RDI + 0x158]
-                "Find": binascii.unhexlify("554889E5488B8758010000"),
-                "Mask": b"",
-                "MaxKernel": "",
-                "MinKernel": "25.0.0",
-                # Replaces structure load with 'MOV RAX, RDI; NOP; NOP; NOP; NOP' to spoof a valid hub node response
-                "Replace": binascii.unhexlify("554889E54889F890909090"),
-                "ReplaceMask": b"",
-                "Skip": 0
-            })
+            # 3. Bypass InternalHubPowerCheck
+            if not patch_exists("Bypass InternalHubPowerCheck (Tahoe fix)"):
+                kernel_patches.append({
+                    "Arch": "x86_64",
+                    "Comment": "Bypass InternalHubPowerCheck via getUpstreamHub (Tahoe fix)",
+                    "Enabled": True,
+                    "Identifier": "com.apple.driver.usb.AppleUSBXHCI",
+                    # Matches: PUSH RBP; MOV RBP, RSP; MOV RAX, qword ptr [RDI + 0x158]
+                    "Find": binascii.unhexlify("554889E5488B8758010000"),
+                    "Mask": b"",
+                    "MaxKernel": "",
+                    "MinKernel": "25.0.0",
+                    # Replaces structure load with 'MOV RAX, RDI; NOP; NOP; NOP; NOP' to spoof a valid hub node response
+                    "Replace": binascii.unhexlify("554889E54889F890909090"),
+                    "ReplaceMask": b"",
+                    "Skip": 0
+                })
         
         if self.model in _T2_TOUCH_BAR_MODELS:
             logging.info("No touch bar patches available for now. Don't worry - your system should boot anyways.")
@@ -416,6 +461,10 @@ class BuildSecurity:
             logging.info("Falls den Mac gar nicht hochfährt und stattdessen einen Kernel Panic zeigt, Sie müssen das Problem melden und die Meldung muss auch die Version der Patcher, \n\ndie Sie gerade verwenden, enthalten.")
     
         """Injects corecrypto binary shims to bypass FIPS Kernel POST verification failures."""
+        if self.model == "MacBookPro15,1":
+            logging.info("- MacBookPro15,1: Skipping corecrypto FIPS shim while isolating persistent IOBufferCopyController bridge timeout.")
+            return
+
         logging.info("- Injecting corecrypto FIPS POST binary shims for Tahoe targets")
     
         corecrypto_patch = {
@@ -464,7 +513,10 @@ class BuildSecurity:
             self._apply_t2_kernel_patches_tahoe()
 
             # 2. Structural boot arguments configuration (Clean tokenization strings)
-            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-disable_sidecar_mac -disable_media_analysis")
+            if self.model == "MacBookPro15,1":
+                logging.info("- MacBookPro15,1: Skipping Sidecar and mediaanalysis boot-args while isolating persistent IOBufferCopyController bridge timeout.")
+            else:
+                self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-disable_sidecar_mac -disable_media_analysis")
 
             # 3. Scope graphics injection flags strictly to active valid targets
             if self._requires_t2_graphics_injection():
@@ -475,6 +527,22 @@ class BuildSecurity:
             self.config["Misc"]["Security"]["SecureBootModel"] = "Disabled"
             self.config["Misc"]["Security"]["ApECID"]          = 0
             self.config["Misc"]["Security"]["DmgLoading"]      = "Any"
+
+            if self.model == "MacBookPro15,1":
+                logging.info("  > MacBookPro15,1: Reasserting Tahoe installer APFS/compatibility NVRAM after final T2 pass.")
+                self.is_tahoe_target = True
+                self._apply_cryptex_patches(APPLE_NVRAM_UUID)
+                self._update_nvram_string(OCLP_NVRAM_UUID, "OCLP-Settings", "-allow_fv")
+                logging.info("  > MacBookPro15,1: RestrictEvents revpatch=sbvmm is applied in the miscellaneous build stage for Tahoe compatibility checks.")
+                logging.info("  > MacBookPro15,1: Using j215 SecureBootModel to match staged Tahoe 26.2 MacBookPro16,4/J215 assets.")
+                self.config["Misc"]["Security"]["SecureBootModel"] = "j215"
+                self.config["Misc"]["Security"]["DmgLoading"] = "Signed"
+                logging.info("  > MacBookPro15,1: Disabling EFI firmware updater for Tahoe stage-2; latest logs show FirmwareUpdateLauncher/efiupdater status 1 before MSU failure.")
+                self._set_nvram_value(APPLE_NVRAM_UUID, "run-efi-updater", "No", overwrite=True)
+                logging.info("  > MacBookPro15,1: Keeping APFS FileVault allowance patch enabled; latest removal regressed before installer UI.")
+                support.BuildSupport(self.model, self.constants, self.config).get_item_by_kv(
+                    self.config["Kernel"]["Patch"], "Comment", "Force FileVault on Broken Seal"
+                )["Enabled"] = True
 
             logging.info("  > Final T2 verification complete. Execution boundaries isolated.")
             return  # Clean break: T2 completely bypasses Branch B and Shared evaluations

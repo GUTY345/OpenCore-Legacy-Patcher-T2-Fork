@@ -71,7 +71,7 @@ class BuildOpenCore:
         """
         Build EFI folder
         """
-        logging.info("---OpenCore Legacy Patcher T2 by Albert Müller---")
+        logging.info(f"---{self.constants.patcher_full_name} by Albert Müller---")
         utilities.cls()
         logging.info(f"Building Configuration {'for external' if self.constants.custom_model else 'on model'}: {self.model}")
 
@@ -79,8 +79,13 @@ class BuildOpenCore:
         self._set_revision()
 
         # Set Lilu and co.
-        support.BuildSupport(self.model, self.constants, self.config).enable_kext("Lilu.kext", self.constants.lilu_version, self.constants.lilu_path)
-        self.config["Kernel"]["Quirks"]["DisableLinkeditJettison"] = True
+        if self.model == "MacBookPro15,1":
+            logging.info("- MacBookPro15,1: Enabling Lilu.kext for RestrictEvents compatibility bypass while keeping DisableIoMapper disabled.")
+            support.BuildSupport(self.model, self.constants, self.config).enable_kext("Lilu.kext", self.constants.lilu_version, self.constants.lilu_path)
+            self.config["Kernel"]["Quirks"]["DisableLinkeditJettison"] = True
+        else:
+            support.BuildSupport(self.model, self.constants, self.config).enable_kext("Lilu.kext", self.constants.lilu_version, self.constants.lilu_path)
+            self.config["Kernel"]["Quirks"]["DisableLinkeditJettison"] = True
 
         # Intel UHD 630 VMM Stall Fix (2018-2020 Models)
         _T2_UHD630_MODELS = ["MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,3", "MacBookPro16,4", "Macmini8,1", "iMac20,1", "iMac20,2"]
@@ -103,18 +108,15 @@ class BuildOpenCore:
                 self.config.setdefault("PlatformInfo", {})["UpdateSMBIOSMode"] = "Custom"
                 self.config.setdefault("Kernel", {}).setdefault("Quirks", {})["CustomSMBIOSGuid"] = True
                 self.config.setdefault("Misc", {}).setdefault("Security", {})["SecureBootModel"] = "Disabled"
-            except Exception as e:
-                logging.error("Whoops, applying in-memory T2 booter and SMBIOS alignments failed because of the following error:")
-                logging.exception("Stack Trace:")
-                logging.info("Please try again later.")
-                sys.exit(3)
 
                 logging.info("- Adding T2-specific bypass NVRAM variables")
-                
+
                 if "NVRAM" not in self.config:
                     self.config["NVRAM"] = {"Add": {}, "Delete": {}}
                 if "Delete" not in self.config["NVRAM"]:
                     self.config["NVRAM"]["Delete"] = {}
+                if "Add" not in self.config["NVRAM"]:
+                    self.config["NVRAM"]["Add"] = {}
 
                 if "7C436110-AB2A-4BBB-A880-FE41995C9F82" not in self.config["NVRAM"]["Add"]:
                     self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"] = {"boot-args": ""}
@@ -132,17 +134,19 @@ class BuildOpenCore:
                 scrubbed_args = " ".join([arg for arg in raw_args.split() if not arg.startswith("-lilu")])
                 
                 # Append required T2 args safely without compounding spaces
-                t2_args = "-ibtcompatbeta -amfipassbeta"
+                t2_args = "" if self.model == "MacBookPro15,1" else "-ibtcompatbeta -amfipassbeta"
                 self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = f"{scrubbed_args} {t2_args}".strip()
                 
                 # Ensure WriteFlash is enabled to commit changes to SPI ROM
                 self.config["NVRAM"]["WriteFlash"] = True
                 
-                # Force DisableIoMapper for stability
-                self.config["Kernel"]["Quirks"]["DisableIoMapper"] = True
+                # Keep VT-d/IOMMU mapping intact on MacBookPro15,1 while isolating
+                # IOBufferCopyController bridge timeouts. Other T2 models retain
+                # the existing mapper bypass behavior.
+                self.config["Kernel"]["Quirks"]["DisableIoMapper"] = self.model != "MacBookPro15,1"
 
             except Exception as e:
-                logging.error("Whoops, the app failed to inject the required kexts because of the following error:")
+                logging.error("Whoops, applying in-memory T2 booter, SMBIOS, and NVRAM alignments failed because of the following error:")
                 logging.exception("Stack Trace:")
                 logging.info("Please try again later.")
                 sys.exit(3)
@@ -181,15 +185,6 @@ class BuildOpenCore:
         ]:
             function(self.model, self.constants, self.config)
 
-        # Work-around ocvalidate
-        if self.constants.validate is False:
-            logging.info("- Adding bootmgfw.efi BlessOverride")
-            if "BlessOverride" not in self.config["Misc"]:
-                self.config["Misc"]["BlessOverride"] = []
-            self.config["Misc"]["BlessOverride"].append("\\EFI\\Microsoft\\Boot\\bootmgfw.efi")    
-
-    
-    
     def _generate_base(self) -> None:
         """
         Generate OpenCore base folder and config

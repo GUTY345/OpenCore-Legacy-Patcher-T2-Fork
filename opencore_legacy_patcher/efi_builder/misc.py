@@ -138,6 +138,9 @@ class BuildMiscellaneous:
                 "RestrictEvents.kext", self.constants.restrictevents_version, self.constants.restrictevents_path
             )
             self._set_nvram_value(OCLP_UUID, "revpatch", patch_args, overwrite=True)
+            if self.model == "MacBookPro15,1" and "sbvmm" in patch_args.split(","):
+                logging.info("- MacBookPro15,1: Mirroring RestrictEvents revpatch=sbvmm into boot-args for installer/update phases.")
+                self._update_nvram_string("7C436110-AB2A-4BBB-A880-FE41995C9F82", "boot-args", "revpatch=sbvmm")
 
         kext_obj = support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("RestrictEvents.kext")
         if kext_obj and kext_obj.get("Enabled") is False:
@@ -164,7 +167,10 @@ class BuildMiscellaneous:
     def _re_generate_patch_arguments(self) -> list:
         """Generate RestrictEvents patch arguments."""
         re_patch_args = []
-        if self.constants.allow_oc_everywhere is False and (self.constants.serial_settings == "None" or self.constants.secure_status is False):
+        if self.model == "MacBookPro15,1":
+            logging.info("- MacBookPro15,1: Enabling RestrictEvents sbvmm for Tahoe installer compatibility checks.")
+            re_patch_args.append("sbvmm")
+        elif self.constants.allow_oc_everywhere is False and (self.constants.serial_settings == "None" or self.constants.secure_status is False):
             re_patch_args.append("sbvmm")
 
         if self.model in smbios_data.smbios_dictionary:
@@ -416,18 +422,27 @@ class BuildMiscellaneous:
         self.config.setdefault("Kernel", {}).setdefault("Patch", [])
 
         # Prerequisite kext checks
-        for kext, ver, path in [
+        t2_prerequisite_kexts = [
             ("WhateverGreen.kext", self.constants.whatevergreen_version, self.constants.whatevergreen_path),
             ("CryptexFixup.kext", "1.0.5", self.constants.kexts_path),
-            ("AMFIPass.kext", "1.4.1", self.constants.kexts_path)
-        ]:
+            ("AMFIPass.kext", "1.4.1", self.constants.kexts_path),
+        ]
+        if self.model == "MacBookPro15,1":
+            logging.info(f"- {self.model}: Skipping AMFIPass.kext while isolating persistent IOBufferCopyController bridge timeout.")
+            logging.info(f"- {self.model}: Skipping WhateverGreen.kext, CryptexFixup.kext, and iGPU boot arguments while isolating persistent IOBufferCopyController bridge timeout.")
+            t2_prerequisite_kexts = [
+                item for item in t2_prerequisite_kexts
+                if item[0] not in {"AMFIPass.kext", "WhateverGreen.kext", "CryptexFixup.kext"}
+            ]
+
+        for kext, ver, path in t2_prerequisite_kexts:
             obj = builder.get_kext_by_bundle_path(kext)
             if not obj or obj.get("Enabled") is not True:
                 logging.info(f"- Enabling {kext}")
                 builder.enable_kext(kext, ver, path)
 
         # Handle explicit performance/timeout panics on specific MacBook lines
-        if self.model in ["MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1", "MacBookPro16,3"]:
+        if self.model in ["MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1", "MacBookPro15,1", "MacBookPro16,3"]:
             logging.info(f"- {self.model}: Applying Unsupported Mantissa Speed kernel panic patches")
             try:
                 logging.info(f"- {self.model}: Disabling USB-Map.kext and USB-Map-Tahoe.kext if any is there")
@@ -438,29 +453,32 @@ class BuildMiscellaneous:
             except Exception as e:
                 logging.info(f"- {self.model}: Great news! We tried disabling USB-Map.kext and USN-Map-Tahoe.kext but we didn't found them.")
                 logging.info("You don't have to worry about this message.")
-            logging.info("Enabling AppleUSBHostPort patches")
-            self.config["Kernel"]["Patch"].extend([
-                {
-                    "Arch": "x86_64",
-                    "Comment": "Bypass AppleUSBHostPort PowerFloorSession initialization (C1)",
-                    "Enabled": True,
-                    "Identifier": "com.apple.iokit.IOUSBHostFamily",
-                    "Base": "__ZN16AppleUSBHostPort26IOUSBPortPowerFloorSessionC1EPS_",
-                    "Find": b"",  # Dynamically resolved by OpenCore's linker parser
-                    "Replace": b"\xC3",  # ret (Immediately returns, bypassing virtual JMP)
-                    "MinKernel": "24.0.0"
-                },
-                {
-                    "Arch": "x86_64",
-                    "Comment": "Bypass AppleUSBHostPort PowerFloorSession initialization (C2)",
-                    "Enabled": True,
-                    "Identifier": "com.apple.iokit.IOUSBHostFamily",
-                    "Base": "__ZN16AppleUSBHostPort26IOUSBPortPowerFloorSessionC2EPS_",
-                    "Find": b"",
-                    "Replace": b"\xC3",  # ret
-                    "MinKernel": "24.0.0"
-                }
-            ])
+            if self.model == "MacBookPro15,1":
+                logging.info(f"- {self.model}: Skipping AppleUSBHostPort PowerFloorSession patches; IOBufferCopyController timeout persists and latest log shows AppleUSBHostController command failures before panic.")
+            else:
+                logging.info("Enabling AppleUSBHostPort patches")
+                self.config["Kernel"]["Patch"].extend([
+                    {
+                        "Arch": "x86_64",
+                        "Comment": "Bypass AppleUSBHostPort PowerFloorSession initialization (C1)",
+                        "Enabled": True,
+                        "Identifier": "com.apple.iokit.IOUSBHostFamily",
+                        "Base": "__ZN16AppleUSBHostPort26IOUSBPortPowerFloorSessionC1EPS_",
+                        "Find": b"",  # Dynamically resolved by OpenCore's linker parser
+                        "Replace": b"\xC3",  # ret (Immediately returns, bypassing virtual JMP)
+                        "MinKernel": "24.0.0"
+                    },
+                    {
+                        "Arch": "x86_64",
+                        "Comment": "Bypass AppleUSBHostPort PowerFloorSession initialization (C2)",
+                        "Enabled": True,
+                        "Identifier": "com.apple.iokit.IOUSBHostFamily",
+                        "Base": "__ZN16AppleUSBHostPort26IOUSBPortPowerFloorSessionC2EPS_",
+                        "Find": b"",
+                        "Replace": b"\xC3",  # ret
+                        "MinKernel": "24.0.0"
+                    }
+                ])
         APPLE_NVRAM_UUID = "7C436110-AB2A-4BBB-A880-FE41995C9F82"
         logging.info("- Skipping Language and Region selection (all T2 models)")
         
@@ -472,11 +490,14 @@ class BuildMiscellaneous:
         
         # 2. Force the global language/locale environment variables to anchor the region
         # This stops the setup subsystem from falling back to default language/region
-        self._set_nvram_value(APPLE_NVRAM_UUID, "AppleLanguages", ["en-US"], overwrite=True)
+        self._set_nvram_value(APPLE_NVRAM_UUID, "AppleLanguages", "en-US", overwrite=True)
         self._set_nvram_value(APPLE_NVRAM_UUID, "AppleLocale", "en_US", overwrite=True)
 
         logging.info("- Adding T2-specific boot arguments for macOS 15/26")
-        self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-v rddelay=5 igfxfw=2 igfxonln=1 -disable_ext_panics -no_compat_check")
+        if self.model == "MacBookPro15,1":
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-v -no_compat_check")
+        else:
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-v rddelay=5 igfxfw=2 igfxonln=1 -disable_ext_panics -no_compat_check")
             
         # Structure guarding for OpenCore NVRAM delete layout
         self.config.setdefault("NVRAM", {}).setdefault("Delete", {})
@@ -495,8 +516,14 @@ class BuildMiscellaneous:
         self.config.setdefault('Kernel', {}).setdefault('Patch', [])
         kernel_patches = self.config['Kernel']['Patch']
 
+        skip_sep_bridge_patches = False
+        if self.model == "MacBookPro15,1":
+            logging.info(f"- {self.model}: Re-enabling AppleSEP/xART/OOL bridge patches; Tahoe installer boots now, but APFS target volumes fail to mount/add.")
+
         # Disable xART validation capacity loop checks safely (Fixes kernel panics upon trying to boot macOS 26 Tahoe via OpenCore)
-        if not any(p.get("Comment") == "Bypass XARTDisableLog limits (Tahoe Cache Fix)" for p in kernel_patches):
+        if skip_sep_bridge_patches:
+            logging.info(f"- {self.model}: Skipping AppleSEP bridge/OOL kernel patches.")
+        elif not any(p.get("Comment") == "Bypass XARTDisableLog limits (Tahoe Cache Fix)" for p in kernel_patches):
             logging.info("  > Injecting AppleSEPManager text segment check bypass into kernel cache")
             kernel_patches.append({
                 "Arch": "x86_64",
@@ -505,7 +532,7 @@ class BuildMiscellaneous:
                 "Count": 1,
                 "Enabled": True,
                 # Force OpenCore to scan the global prelinked kernel cache pool
-                "Identifier": "apple",
+                "Identifier": "kernel",
                 # Matches exactly lines f8001c4858f and f8001c48593: CMP RCX, 0x10; JA LAB_ffffff8001c485fb
                 "Find": b"\x48\x83\xF9\x10\x77\x66",
                 "Mask": b"",
@@ -519,7 +546,7 @@ class BuildMiscellaneous:
             })
 
         # Force AppleSEPDeviceService OOL constraints (Fixes hardware channel allocation drops)
-        if not any(p.get("Comment") == "Hardcode SEP OOL Max Send Pages Limit" for p in kernel_patches):
+        if not skip_sep_bridge_patches and not any(p.get("Comment") == "Hardcode SEP OOL Max Send Pages Limit" for p in kernel_patches):
             logging.info("  > Injecting AppleSEPDeviceService OOL payload bypass")
             kernel_patches.append({
                 "Arch": "x86_64",
@@ -527,7 +554,7 @@ class BuildMiscellaneous:
                 "Comment": "Hardcode SEP OOL Max Send Pages Limit",
                 "Count": 1,
                 "Enabled": True,
-                "Identifier": "apple",
+                "Identifier": "kernel",
                 # Finds: MOV RAX, [RDI+0x88]; MOVZX EAX, byte ptr [RAX+0x6]; POP RBP; RET
                 "Find": b"\x48\x8b\x87\x88\x00\x00\x00\x0f\xb6\x40\x06\x5d\xc3",
                 "Mask": b"",
@@ -541,6 +568,9 @@ class BuildMiscellaneous:
             })
 
         # Disable AppleKeyStoreUserClient assertion deadline loops (Fixes Disk Utility Verification Hangs)
+        if self.model == "MacBookPro15,1":
+            logging.info(f"- {self.model}: Re-enabling AppleKeyStore deadline bypass only; Tahoe installer reaches UI but cannot mount APFS target volumes.")
+
         if not any(p.get("Comment") == "Bypass AppleKeyStore Deadline Mismatch" for p in kernel_patches):
             logging.info("  > Injecting AppleKeyStoreUserClient operational state bypass")
             kernel_patches.append({

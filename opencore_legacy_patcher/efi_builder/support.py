@@ -286,6 +286,17 @@ class BuildSupport:
                                 if key not in item:
                                     item[key] = value
 
+        apple_nvram = self.config.get("NVRAM", {}).get("Add", {}).get("7C436110-AB2A-4BBB-A880-FE41995C9F82", {})
+        if "boot-args" in apple_nvram:
+            seen = set()
+            deduped_args = []
+            for arg in apple_nvram["boot-args"].split():
+                if arg in seen:
+                    continue
+                seen.add(arg)
+                deduped_args.append(arg)
+            apple_nvram["boot-args"] = " ".join(deduped_args)
+
         if not self.constants.recovery_status:
             for i in list(self.constants.build_path.rglob("__MACOSX")):
                 if i.is_dir():

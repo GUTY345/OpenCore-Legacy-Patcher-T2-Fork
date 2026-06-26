@@ -7,10 +7,12 @@ import wx.html2
 
 import sys
 import logging
+import subprocess
 import requests
 import markdown2
 import threading
 import webbrowser
+from pathlib import Path
 from packaging import version
 
 from .. import constants
@@ -67,11 +69,11 @@ class MainFrame(wx.Frame):
         logo.Centre(wx.HORIZONTAL)
 
         # Title label
-        title_label = wx.StaticText(self, label=f"OpenCore Legacy Patcher for T2 Macs Insider Preview", pos=(-1, 128))
+        title_label = wx.StaticText(self, label=self.constants.patcher_name, pos=(-1, 128))
         title_label.SetFont(gui_support.font_factory(25, wx.FONTWEIGHT_BOLD))
         title_label.Centre(wx.HORIZONTAL)
 
-        version_label = wx.StaticText(self, label=f"Version {self.constants.patcher_version}{' (Nightly)' if not self.constants.commit_info[0].startswith('refs/tags') else ''}", pos=(-1, title_label.GetPosition()[1] + 32))
+        version_label = wx.StaticText(self, label=f"Version {self.constants.patcher_version_label}", pos=(-1, title_label.GetPosition()[1] + 32))
         version_label.SetFont(gui_support.font_factory(13, wx.FONTWEIGHT_NORMAL))
         version_label.Centre(wx.HORIZONTAL)
         version_label.SetForegroundColour(wx.Colour(128, 128, 128))
@@ -105,6 +107,13 @@ class MainFrame(wx.Frame):
                 "icon": str(self.constants.icns_resource_path / "OC-Support.icns"),
             },
         }
+
+        if self._host_is_macbookpro151():
+            menu_buttons["Patch Tahoe Stage-2"] = {
+                "function": self.on_patch_tahoe_stage2,
+                "description": ["Repairs staged Tahoe installer", "metadata after first restart.", "MacBookPro15,1 only."],
+                "icon": str(self.constants.icns_resource_path / "OC-Installer.icns"),
+            }
 
         button_x = 30
         button_y = model_label.GetPosition()[1] + 30
@@ -199,7 +208,7 @@ class MainFrame(wx.Frame):
             self.constants.has_checked_updates = True
             pop_up = wx.MessageDialog(
                 self,
-                f"OpenCore Legacy Patcher has been updated to the latest version: {self.constants.patcher_version}\n\nWould you like to update OpenCore and your root volume patches?",
+                f"{self.constants.patcher_name} has been updated to the latest version: {self.constants.patcher_version_label}\n\nWould you like to update OpenCore and your root volume patches?",
                 "Update successful!",
                 style=wx.YES_NO | wx.YES_DEFAULT | wx.ICON_INFORMATION
             )
@@ -223,6 +232,76 @@ class MainFrame(wx.Frame):
             self.Close()
 
         threading.Thread(target=self._check_for_updates).start()
+
+    def _host_is_macbookpro151(self) -> bool:
+        return (self.constants.custom_model or self.constants.computer.real_model) == "MacBookPro15,1"
+
+    def _tahoe_stage2_script_path(self) -> Path:
+        return Path(__file__).resolve().parents[2] / "docs" / "scripts" / "tahoe_stage2_asset_patch.py"
+
+    def on_patch_tahoe_stage2(self, event: wx.Event = None):
+        if not self._host_is_macbookpro151():
+            wx.MessageBox(
+                "Tahoe Stage-2 patching is currently limited to MacBookPro15,1.",
+                "Unsupported Model",
+                wx.OK | wx.ICON_WARNING
+            )
+            return
+
+        script_path = self._tahoe_stage2_script_path()
+        if not script_path.exists():
+            wx.MessageBox(
+                f"Could not find Tahoe Stage-2 patch script:\n\n{script_path}",
+                "Patch Script Missing",
+                wx.OK | wx.ICON_ERROR
+            )
+            return
+
+        warning = wx.MessageDialog(
+            self,
+            "This will scan /Volumes for staged macOS Tahoe Install Data and apply the MacBookPro15,1 Tahoe Stage-2 metadata repair.\n\n"
+            "Use this after the installer has copied files and restarted once, before booting the macOS Installer stage again.",
+            "Patch Tahoe Stage-2?",
+            wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING
+        )
+        warning.ShowModal()
+        if warning.GetReturnCode() != wx.ID_YES:
+            logging.info("User cancelled Tahoe Stage-2 patch.")
+            return
+
+        logging.info("- Running Tahoe Stage-2 GUI patch")
+        threading.Thread(target=self._run_tahoe_stage2_patch, args=(script_path,), daemon=True).start()
+
+    def _run_tahoe_stage2_patch(self, script_path: Path):
+        command = [
+            sys.executable,
+            str(script_path),
+            "--diagnose-logs",
+            "--materialize-additional-manifests",
+            "--materialize-bootcache-system-volume",
+            "--patch-msu-manifest",
+            "--apply",
+        ]
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        output = result.stdout.strip() or "(no output)"
+        logging.info("Tahoe Stage-2 patch exited with code %s", result.returncode)
+        logging.info(output)
+        wx.CallAfter(self._show_tahoe_stage2_result, result.returncode, output)
+
+    def _show_tahoe_stage2_result(self, returncode: int, output: str):
+        if returncode == 0:
+            wx.MessageBox(
+                f"Tahoe Stage-2 patch completed.\n\n{output}",
+                "Tahoe Stage-2 Patch Complete",
+                wx.OK | wx.ICON_INFORMATION
+            )
+            return
+
+        wx.MessageBox(
+            f"Tahoe Stage-2 patch failed.\n\n{output}",
+            "Tahoe Stage-2 Patch Failed",
+            wx.OK | wx.ICON_ERROR
+        )
 
 
     def _check_for_updates(self):
@@ -253,7 +332,7 @@ class MainFrame(wx.Frame):
             # Only trigger if remote is NEWER. 
             # If remote <= local, we are already up to date or ahead.
             if remote_v <= local_v:
-                logging.info(f"OCLP-T2 is up to date. (Local: {local_v} >= Remote: {remote_v})")
+                logging.info(f"{self.constants.patcher_name} is up to date. (Local: {local_v} >= Remote: {remote_v})")
                 return
     
         except version.InvalidVersion:
@@ -332,8 +411,8 @@ Please check the Github page for more information about this release."""
         panel = wx.Panel(frame)
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.AddSpacer(10)
-        self.title_text = wx.StaticText(panel, label="A new version of OpenCore Legacy Patcher T2 is available!")
-        self.description = wx.StaticText(panel, label=f"OpenCore Legacy Patcher T2 {oclp_version} is now available - You have {self.constants.patcher_version}{' (Nightly)' if not self.constants.commit_info[0].startswith('refs/tags') else ''}. Would you like to update?")
+        self.title_text = wx.StaticText(panel, label=f"A new version of {self.constants.patcher_name} is available!")
+        self.description = wx.StaticText(panel, label=f"{self.constants.patcher_name} {oclp_version} is now available - You have {self.constants.patcher_version_label}. Would you like to update?")
         self.title_text.SetFont(gui_support.font_factory(19, wx.FONTWEIGHT_BOLD))
         self.description.SetFont(gui_support.font_factory(13, wx.FONTWEIGHT_NORMAL))
         self.web_view = wx.html2.WebView.New(panel, style=wx.BORDER_SUNKEN)
