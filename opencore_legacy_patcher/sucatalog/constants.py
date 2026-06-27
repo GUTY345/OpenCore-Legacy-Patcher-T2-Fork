@@ -2,7 +2,10 @@
 constants.py: Enumerations for sucatalog-py
 """
 
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from opencore_legacy_patcher.utils.enums import StrEnum
 
 
 class SeedType(StrEnum):

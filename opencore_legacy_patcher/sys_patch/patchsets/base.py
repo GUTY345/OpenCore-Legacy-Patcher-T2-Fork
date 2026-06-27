@@ -2,7 +2,10 @@
 base.py: Base class for all patch sets
 """
 
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from opencore_legacy_patcher.utils.enums import StrEnum
 
 
 class PatchType(StrEnum):
