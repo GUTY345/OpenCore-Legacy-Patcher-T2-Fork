@@ -21,5 +21,5 @@ class CPUGen(enum.IntEnum):
     comet_lake    = 12   # 10000
     ice_lake      = 13   # 10000
 
-    apple_dtk     = 100  # A12
-    apple_silicon = 101  # A14 and newer (not tracked beyond this point)
+    apple_dtk     = 100  # Apple A12
+    apple_silicon = 101  # Apple M1 and newer, and Apple A14 and newer (not tracked beyond this point)
