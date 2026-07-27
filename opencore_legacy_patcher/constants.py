@@ -16,15 +16,15 @@ class Constants:
     def __init__(self) -> None:
         # Patcher Versioning
         # Wenn eine Version mit s endet, es heißt, dass sie noch nicht fertig ist.
-        self.patcher_version:                 str = "4.0.0.12040"  # OpenCore-Legacy-Patcher
+        self.patcher_version:                 str = "4.0.0.15915"  # OpenCore-Legacy-Patcher
         self.patcher_version_label=self.patcher_version
-        self.patcher_support_pkg_version:     str = "1.9.6"  # PatcherSupportPkg
+        self.patcher_support_pkg_version:     str = "2.0.0"  # PatcherSupportPkg
         self.copyright_date:                  str = "Copyright © 2020-2025 Dortania"
         self.patcher_name:                    str = "OpenCore Legacy Patcher T2"
         self.patcher_full_name:               str = f"{self.patcher_name} version {self.patcher_version_label}"
 
         # URLs
-        self.url_patcher_support_pkg:         str = "https://github.com/dortania/PatcherSupportPkg/releases/download/"
+        self.url_patcher_support_pkg:         str = "https://github.com/YBronst/PatcherSupportPkg/releases/download/"
         self.guide_link:                      str = "https://dortania.github.io/OpenCore-Legacy-Patcher/"
         self.repo_link:                       str = "https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/"
         self.installer_pkg_url:               str = f"{self.repo_link}/releases/download/{self.patcher_version}/AutoPkg-Assets.pkg"
@@ -240,6 +240,7 @@ class Constants:
         self.disable_mediaanalysisd: bool = False  # Set mediaanalysisd to spawn
         self.force_quad_thread:      bool = False #  Force quad thread mode (cpus=4)
         self.set_alc_usage:          bool = True  #  Set AppleALC usage
+        self.allow_modern_audio:     bool = True  #  Restore AppleHDA.kext on macOS Tahoe (Apple dropped analog audio for non-T2 audio routing)
         self.allow_3rd_party_drives: bool = True  #  Allow ThridPartyDrives quirk
         self.allow_nvme_fixing:      bool = True  #  Allow NVMe Kernel Space Patches
         self.apfs_trim_timeout:      bool = True  #  Set APFS Trim timeout
@@ -262,13 +263,10 @@ class Constants:
         """
 
         try:
-            logging.info("Suchen ob die Version speziell ist")
             logging.info("Checking if the version is special")
             version.parse(self.patcher_version)
             return False
         except version.InvalidVersion:
-            logging.info("Wir haben bestätigt, dass es sich um eine spezielle Version handelt.")
-            logging.info("Sie werden keine automatische Updates erhalten.")
             logging.info("We have confirmed that this is a special version")
             logging.info("You won't receive automatic updates.")
             return True

@@ -127,7 +127,8 @@ class OpenCoreLegacyPatcher:
         if self.constants.computer.build_model is None:
             logging.info(f"Initializing build_model to native host: {self.computer.real_model}")
             self.constants.computer.build_model = self.computer.real_model
-        threading.Thread(target=analytics_handler.Analytics(self.constants).send_analytics).start()
+        self.constants.analytics_thread = threading.Thread(target=analytics_handler.Analytics(self.constants).send_analytics)
+        self.constants.analytics_thread.start()
 
         if utilities.check_cli_args() is None:
             self.constants.cli_mode = False
