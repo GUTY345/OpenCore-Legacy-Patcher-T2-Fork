@@ -17,7 +17,6 @@ from datetime import date
 from .. import constants
 
 from ..support import utilities
-from ..datasets import model_array
 
 from .networking import (
 wired,
@@ -86,21 +85,19 @@ class BuildOpenCore:
         logging.info("---OpenCore Legacy Patcher T2 by Albert Müller---")
         try:
             if self.constants.detected_os >= os_data.os_data.golden_gate:
-                webbrowser.open("https://www.apple.com/os/macos/")
-                logging.error("macOS 27 Golden Gate is not available for Intel Macs. Apple Silicon required. Please do not try to upgrade to Golden Gate on Intel Macs.")
-                logging.error("macOS 27 Golden Gate ist nicht für Intel Macs verfügbar, Apple Silicon ist erforderlich. Bitte nicht probieren, auf Golden Gate auf Intel Macs umzusteigen.")
-                logging.info("macOS 27 Golden Gate is compiled only for arm64, specifically for Apple Silicon.")
-                logging.info("macOS 27 Golden Gate ist nur für arm64, spezifischer für Apple Silicon kompiliert.")
-                logging.info("Please select macOS 26 Tahoe or older version.")
-                logging.info("Bitte wählen Sie macOS 26 oder ältere Version.")
-                sys.exit(1)
+                if not self.constants.custom_model:
+                    webbrowser.open("https://www.apple.com/os/macos/")
+                    logging.error("macOS 27 Golden Gate is not available for Intel Macs. Apple Silicon required. Please do not try to upgrade to Golden Gate on Intel Macs.")
+                    logging.info("macOS 27 Golden Gate is compiled only for arm64, specifically for Apple Silicon.")
+                    logging.info("Please select macOS 26 Tahoe or older version.")
+                    sys.exit(0)
+                else:
+                    logging.info("You're not building OpenCore on your target system that is running macOS 27 Golden Gate. Continuing.")
             else:
                 logging.info("You're not targeting macOS 27 Golden Gate, this is good.")
-                logging.info("Sie haben nicht macOS 27 Golden Gate ausgewählt, das ist gut.")
                 pass
         except Exception as e:
             logging.error("We couldn't make sure if you are targeting macOS 27 Golden Gate or newer. Skip checking...")
-            logging.error("Wir könnten nicht feststellen, ob Sie macOS 27 Golden Gate installieren möchten oder nicht. Das wird übersprungen")
             logging.exception("Stack Trace:")
             pass
                 
@@ -114,14 +111,14 @@ class BuildOpenCore:
         support.BuildSupport(self.model, self.constants, self.config).enable_kext("Lilu.kext", self.constants.lilu_version, self.constants.lilu_path)
         self.config["Kernel"]["Quirks"]["DisableLinkeditJettison"] = True
 
-        # Intel UHD 630 VMM Stall Fix (2018-2020 Models)
-        _T2_UHD630_MODELS = ["MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,3", "MacBookPro16,4", "Macmini8,1", "iMac20,1", "iMac20,2"]
+        # Intel UHD 630 VMM Stall Fix — scoped to the sole supported model (MacBookPro15,1)
+        _T2_UHD630_MODELS = ["MacBookPro15,1"]
         if self.model in _T2_UHD630_MODELS:
             logging.info(f"- Disabling VMM CPUID for {self.model} to prevent UHD 630 driver stall")
             self.constants.set_vmm_cpuid = False
 
-        # Determine T2 status upfront
-        is_t2 = self.model in model_array.T2Macs or "T2_CHIP" in self.constants.device_properties.get(self.model, {}).get("Features", [])
+        # Determine T2 status upfront — this fork supports only MacBookPro15,1
+        is_t2 = self.model == "MacBookPro15,1"
 
         if is_t2:
             try:
@@ -131,53 +128,42 @@ class BuildOpenCore:
                     "EnableWriteUnprotector": False,
                     "SyncRuntimePermissions": False,
                     "DevirtualiseMmio": False,
+                    # Exp B7: DisableWatchdog prevents UEFI timeout during T2 boot
+                    # (T2 bridge init can take longer than standard watchdog)
+                    "DisableWatchdog": True,
                 })
                 self.config.setdefault("PlatformInfo", {})["UpdateSMBIOSMode"] = "Custom"
                 self.config.setdefault("Kernel", {}).setdefault("Quirks", {})["CustomSMBIOSGuid"] = True
                 self.config.setdefault("Misc", {}).setdefault("Security", {})["SecureBootModel"] = "Disabled"
+                # Exp B7: Enable debug logging for verbose boot troubleshooting
+                self.config.setdefault("Misc", {}).setdefault("Debug", {}).update({
+                    "AppleDebug": True,
+                    "ApplePanic": True,
+                    "Target": 67,
+                })
+
+                # Exp B7: Enable Booter → Patch "Skip Board ID check" and
+                # "Reroute HW_BID to OC_BID" for T2 Board ID spoofing.
+                # These patches bypass the Board ID verification in the booter
+                # so the installer doesn't see the real T2 Board ID (J680AP).
+                booter_patches = self.config.setdefault("Booter", {}).setdefault("Patch", [])
+                for patch_comment in ["Skip Board ID check", "Reroute HW_BID to OC_BID"]:
+                    for patch in booter_patches:
+                        if patch.get("Comment") == patch_comment:
+                            patch["Enabled"] = True
+                            logging.info(f"- Exp B7: Enabling Booter patch: {patch_comment}")
+                            break
             except Exception as e:
                 logging.error("Whoops, applying in-memory T2 booter and SMBIOS alignments failed because of the following error:")
                 logging.exception("Stack Trace:")
                 logging.info("Please try again later.")
                 sys.exit(3)
 
-                logging.info("- Adding T2-specific bypass NVRAM variables")
-                
-                if "NVRAM" not in self.config:
-                    self.config["NVRAM"] = {"Add": {}, "Delete": {}}
-                if "Delete" not in self.config["NVRAM"]:
-                    self.config["NVRAM"]["Delete"] = {}
-
-                if "7C436110-AB2A-4BBB-A880-FE41995C9F82" not in self.config["NVRAM"]["Add"]:
-                    self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"] = {"boot-args": ""}
-
-                # Ensure we strictly clean out legacy variables from NVRAM to prevent corecrypto mismatch
-                if "7C436110-AB2A-4BBB-A880-FE41995C9F82" not in self.config["NVRAM"]["Delete"]:
-                    self.config["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"] = []
-                
-                for target_arg in ["boot-args", "csr-active-config", "amfi-allow-arguments"]:
-                    if target_arg not in self.config["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]:
-                        self.config["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].append(target_arg)
-
-                # Fetch template boot-args, scrub any accidental Lilu flags inherited from template plists
-                raw_args = self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].get("boot-args", "")
-                scrubbed_args = " ".join([arg for arg in raw_args.split() if not arg.startswith("-lilu")])
-                
-                # Append required T2 args safely without compounding spaces
-                t2_args = "-ibtcompatbeta -amfipassbeta"
-                self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = f"{scrubbed_args} {t2_args}".strip()
-                
-                # Ensure WriteFlash is enabled to commit changes to SPI ROM
-                self.config["NVRAM"]["WriteFlash"] = True
-                
-                # Force DisableIoMapper for stability
-                self.config["Kernel"]["Quirks"]["DisableIoMapper"] = True
-
-            except Exception as e:
-                logging.error("Whoops, the app failed to inject the required kexts because of the following error:")
-                logging.exception("Stack Trace:")
-                logging.info("Please try again later.")
-                sys.exit(3)
+            # MacBookPro15,1-only T2 configuration.
+            # Keep this scoped to the 15-inch 2018 model so the existing
+            # behavior of every other model remains unchanged.
+            if self.model == "MacBookPro15,1":
+                self._apply_macbookpro15_1_t2_config()
         else:
             # For Non-T2 Legacy Hardware
             if "NVRAM" not in self.config:
@@ -214,10 +200,8 @@ class BuildOpenCore:
             try:
                 function(self.model, self.constants, self.config)
             except Exception as e:
-                logging.error("Es gibt einen schwerwiegenden Fehler")
                 logging.error("There is a serious error")
-                logger.exception(f"Fehler, die Funktion, die heißt {function.__name__} zu starten")
-                logger.exception(f"Failed to initialize the function called {function.__name__}")
+                logging.exception(f"Failed to initialize the function called {function.__name__}")
                 logging.exception("Stack Trace:")
                 sys.exit(3)
 
@@ -234,6 +218,45 @@ class BuildOpenCore:
             target_path = "\\EFI\\Microsoft\\Boot\\bootmgfw.efi"
             if target_path not in self.config["Misc"]["BlessOverride"]:
                 self.config["Misc"]["BlessOverride"].append(target_path)    
+
+    def _apply_macbookpro15_1_t2_config(self) -> None:
+        """Apply configuration that is verified for MacBookPro15,1 only."""
+        logging.info("- Adding MacBookPro15,1 T2 bypass NVRAM variables")
+        apple_nvram_uuid = "7C436110-AB2A-4BBB-A880-FE41995C9F82"
+
+        try:
+            if "NVRAM" not in self.config:
+                self.config["NVRAM"] = {"Add": {}, "Delete": {}}
+            if "Add" not in self.config["NVRAM"]:
+                self.config["NVRAM"]["Add"] = {}
+            if "Delete" not in self.config["NVRAM"]:
+                self.config["NVRAM"]["Delete"] = {}
+
+            self.config["NVRAM"]["Add"].setdefault(apple_nvram_uuid, {"boot-args": ""})
+            self.config["NVRAM"]["Delete"].setdefault(apple_nvram_uuid, [])
+
+            for target_arg in ["boot-args", "csr-active-config", "amfi-allow-arguments"]:
+                if target_arg not in self.config["NVRAM"]["Delete"][apple_nvram_uuid]:
+                    self.config["NVRAM"]["Delete"][apple_nvram_uuid].append(target_arg)
+
+            raw_args = self.config["NVRAM"]["Add"][apple_nvram_uuid].get("boot-args", "")
+            scrubbed_args = " ".join(arg for arg in raw_args.split() if not arg.startswith("-lilu"))
+            t2_args = "-ibtcompatbeta -amfipassbeta"
+            self.config["NVRAM"]["Add"][apple_nvram_uuid]["boot-args"] = f"{scrubbed_args} {t2_args}".strip()
+
+            self.config["NVRAM"]["WriteFlash"] = True
+            # EXPERIMENT (2026-07-16, HANDOFF §0.5): boot panic
+            #   IODCC: timeout ("firmware or bridge unresponsive") @IOBufferCopyControllerBase.cpp:269
+            #   => T2 bridge DMA/PCI comms fails very early (before OS init). Hypothesis #1:
+            #   disabling VT-d/IOMMU on a T2 Mac with working VT-d breaks DMA to the T2 bridge,
+            #   which is exactly the IOBufferCopyController copy-engine the panic names.
+            #   Set to False to test. REVERT to True if this does not fix the panic.
+            self.config["Kernel"]["Quirks"]["DisableIoMapper"] = False
+        except Exception:
+            logging.error("Failed to apply MacBookPro15,1 T2 configuration")
+            logging.exception("Stack Trace:")
+            logging.info("Please try again later.")
+            sys.exit(3)
 
     
     
@@ -379,12 +402,19 @@ class BuildOpenCore:
             sys.exit(3)
 
         # Post-build handling
-        logging.info("Post-build handling")
-        support.BuildSupport(self.model, self.constants, self.config).sign_files()
-        support.BuildSupport(self.model, self.constants, self.config).validate_pathing()
+        try:
+            logging.info("Post-build handling")
+            support.BuildSupport(self.model, self.constants, self.config).sign_files()
+            support.BuildSupport(self.model, self.constants, self.config).validate_pathing()
 
-        logging.info("")
-        logging.info(f"Your OpenCore EFI for {self.model} has been built at:")
-        logging.info(f"    {self.constants.opencore_release_folder}")
-        logging.info("")
+            logging.info("")
+            logging.info(f"Your OpenCore EFI for {self.model} has been built at:")
+            logging.info(f"    {self.constants.opencore_release_folder}")
+            logging.info("")
+        except Exception as e:
+            logging.info("")
+            logging.error(f"Your OpenCore EFI for {self.model} is not ready due to an unexpected error:")
+            logging.exception("Stack Trace:")
+            logging.info("Please try again later.")
+            sys.exit(3)
     

@@ -21,14 +21,18 @@ from ..datasets import (
     os_data
 )
 
-_T2_MODELS = {
-    "MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1",
-    "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4",
-    "MacBookPro16,1", "MacBookPro16,3", "MacBookPro16,4",
-    "Macmini8,1",
-    "iMac20,1", "iMac20,2",
-    "iMacPro1,1",
-}
+
+class PatchValidationError(Exception):
+    """
+    Raised when a kernel Find/Replace patch fails validation
+    (e.g. Find and Replace byte lengths differ).
+
+    Raising a dedicated exception instead of calling sys.exit() keeps the
+    guardrail intact in production (BuildOpenCore aborts the build) while
+    making _validate_patch unit-testable — a test can assert the exception
+    is raised instead of the whole interpreter exiting.
+    """
+    pass
 
 
 class BuildMiscellaneous:
@@ -79,8 +83,14 @@ class BuildMiscellaneous:
             self.config["NVRAM"]["Add"][uuid][key] = value
 
     def _is_t2_mac(self) -> bool:
-        """Check whether the current model configuration matches a known T2 system."""
-        return self.model in _T2_MODELS
+        """Check whether the current model is this fork's sole supported T2 target.
+
+        This fork focuses exclusively on the MacBook Pro 15-inch 2018
+        (MacBookPro15,1). No T2-specific patches, kexts, boot-args or NVRAM
+        overrides may be applied to any other model, so we treat MacBookPro15,1
+        as the only "T2" target we recognise.
+        """
+        return self.model == "MacBookPro15,1"
 
     def _build(self) -> None:
         """Kick off Misc Build Process."""
@@ -162,9 +172,24 @@ class BuildMiscellaneous:
         return re_block_args
     
     def _re_generate_patch_arguments(self) -> list:
-        """Generate RestrictEvents patch arguments."""
+        """Generate RestrictEvents patch arguments.
+
+        sbvmm must be injected for T2 Macs regardless of serial_settings because
+        macOS Tahoe's installer preflight checks SupportedDeviceModels via
+        RestrictEvents at install time.  When serial_settings is "Advanced" the
+        original condition (serial_settings == "None" or secure_status is False)
+        never fires, leaving revpatch=sbvmm absent from the 4D1FDA02 NVRAM key
+        and causing BIPreflightError Code 9 (J680AP / MacBookPro15,1 confirmed).
+        """
+        
         re_patch_args = []
-        if self.constants.allow_oc_everywhere is False and (self.constants.serial_settings == "None" or self.constants.secure_status is False):
+        # Exp B6: sbvmm MUST be injected for T2 Macs regardless of allow_oc_everywhere
+        # or serial_settings.  macOS Tahoe's installer preflight checks
+        # SupportedDeviceModels via RestrictEvents at install time.  Without sbvmm,
+        # T2 boards (J680AP / MacBookPro15,1) fail with BIPreflightError Code 9.
+        if self._is_t2_mac():
+            re_patch_args.append("sbvmm")
+        elif self.constants.allow_oc_everywhere is False and (self.constants.serial_settings == "None" or self.constants.secure_status is False):
             re_patch_args.append("sbvmm")
 
         if self.model in smbios_data.smbios_dictionary:
@@ -410,40 +435,71 @@ class BuildMiscellaneous:
             sys.exit(3)
 
     def _validate_patch(self, patch_dict):
+        """
+        Validate a kernel Find/Replace patch before it is injected.
+
+        Returns True when the patch is safe to append. Raises
+        PatchValidationError when the patch is invalid (Find/Replace length
+        mismatch, or the byte fields cannot be measured). Callers that want
+        the build to abort should let the exception propagate to
+        BuildOpenCore, which logs it and exits.
+        """
+        comment = patch_dict.get("Comment")
+
+        # Measure the byte fields. This is deliberately kept in a narrow
+        # try/except so that an unexpected shape (e.g. Find is None) becomes a
+        # PatchValidationError rather than being confused with the length
+        # mismatch case below.
         try:
             find_bytes = patch_dict.get("Find")
             replace_bytes = patch_dict.get("Replace")
-            
-            # Längenvergleich
-            if len(find_bytes) != len(replace_bytes):
-                logging.error(f"LÄNGENFEHLER in '{patch_dict.get('Comment')}': "
-                              f"Find={len(find_bytes)} Bytes, Replace={len(replace_bytes)} Bytes.")
-                logging.error(f"LENGTH ISSUE in '{patch_dict.get('Comment')}': "
-                              f"Find={len(find_bytes)} Bytes, Replace={len(replace_bytes)} Bytes.")
-                logging.info("Um dieses Fehler zu beheben, Sie müssen nach Updates suchen und falls ein Update ist verfügbar, zu aktualisieren.")
-                logging.info("To fix this issue, you need to check for updates and if a newer version is available, to update.")
-                logging.info("Falls noch keine neue Version verfügbar ist, Voralpha 7 für Alpha 16 und neuere Voralphas haben dieses Fehler für meisten Patches behoben.")
-                logging.info("If there is no newer version available, pre-alpha 7 for alpha 16 and newer pre-alphas have fixed this issue for most patches.")
-                sys.exit(3)
-            return True
+            find_len = len(find_bytes)
+            replace_len = len(replace_bytes)
         except Exception as e:
-            logging.error("Wir haben einen Problem, die Bytes-Länge zu vergleichen")
-            logging.error("We have an issue to compare the bytes length.")
-            sys.exit(3)
+            logging.error("We have an issue comparing the bytes length.")
+            raise PatchValidationError(
+                f"Cannot measure Find/Replace byte lengths for patch '{comment}': {e}"
+            ) from e
+
+        # Length comparison — Find and Replace MUST be the same length.
+        if find_len != replace_len:
+            logging.error(f"LENGTH ISSUE in '{comment}': "
+                          f"Find={find_len} Bytes, Replace={replace_len} Bytes.")
+            raise PatchValidationError(
+                f"Length mismatch in patch '{comment}': "
+                f"Find={find_len} bytes, Replace={replace_len} bytes"
+            )
+
+        # Audit trail: report exactly which bytes this patch will inject.
+        # This is the core guardrail against guessing — every injected patch
+        # must show its Find/Replace lengths matching here before it ships.
+        find_hex = binascii.hexlify(find_bytes).decode().upper()
+        replace_hex = binascii.hexlify(replace_bytes).decode().upper()
+        logging.info(
+            f"[patch-audit] {comment} | "
+            f"Identifier={patch_dict.get('Identifier')} | "
+            f"Base={patch_dict.get('Base') or '<byte-signature>'} | "
+            f"Find({find_len}B)={find_hex} Replace({replace_len}B)={replace_hex}"
+        )
+        return True
     
     def _t2_handling(self) -> None:
         """T2 Security Chip Handler."""
         if not self._is_t2_mac():
             return
-        enable_experimental_patches = False # Nur auf True setzen wenn der Benutzer manuell selbst bearbeitet und wechselt enable_experimental_patches von False auf True
+        enable_experimental_patches = True  # Exp B7: Enabled for T2 board-id/Image4 RE experiments
         logging.info("If you want to enable optional patches that haven't been tested yet, you should download go to releases")
         logging.info(", then download the zip file, extract it, and then, open up misc.py.")
         logging.info("And afterwards, you need manually to set enable_experimental_patches from False to True")
-        logging.info("Wenn Sie möchten, optionale Patches zu aktivieren, die nicht getestet wurden, Sie müssen nach Releases gehen")
-        logging.info(", denn die Zip-Datei herunterladen, und denn dies zu extrahieren. Und denn misc.py zu öffnen.")
-        logging.info("Und denn, manuell die Funktion enable_experimental_patches von False auf True setzen.")
         builder = support.BuildSupport(self.model, self.constants, self.config)
         self.config.setdefault("Kernel", {}).setdefault("Patch", [])
+
+        if enable_experimental_patches==False:
+            logging.info("Injecting optional patches are not enabled. That's the standard behavior.")
+        elif enable_experimental_patches==True:
+            logging.info("ATTENTION! Injecting optional patches are enabled. These patches haven't been tested yet and may have bugs, which could lead to for example kernel panics.")
+        else:
+            logging.error("We couldn't verify if injecting optional patcges are enabled or not, but they must be disabled if the variable is not set to True.")
 
         # Prerequisite kext checks
         for kext, ver, path in [
@@ -456,8 +512,15 @@ class BuildMiscellaneous:
                 logging.info(f"- Enabling {kext}")
                 builder.enable_kext(kext, ver, path)
 
+        # Exp B7: WhateverGreen is KEPT ENABLED for T2 to process igfxonln=1,
+        # igfxfw=2, agdpmod=vit9696, -wegnoegpu boot-args.  Note: WEG probe()
+        # may fail on Tahoe — if so, these args are simply not processed (harmless).
+        # DeviceProperties injection (ig-platform-id, disable-gpu) works without WEG
+        # regardless.  If WEG causes GUI hang during installer, disable it manually
+        # via boot-args by adding -igfxnoigpuoutput or by removing WEG.kext.
+
         # Handle explicit performance/timeout panics on specific MacBook lines
-        # Der Grund warum MinKernel auf 24.0.0 (Sequoias Version von Darwin) stattdessen von 25.x.x eingestellt ist, ist es die Installationsprogramm läuft auf Darwin 24 noch, auch die von 26 Tahoe.
+        # MinKernel is 24.0.0 (Sequoia's Darwin version) instead of 25.x.x because the installer runs on Darwin 24, even for macOS 26 Tahoe.
         if self.model in ["MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1", "MacBookPro16,3"]:
             logging.info(f"- {self.model}: Applying Unsupported Mantissa Speed kernel panic patches")
             try:
@@ -489,7 +552,7 @@ class BuildMiscellaneous:
 
         try:
             logging.info("- Adding T2-specific boot arguments for macOS 15/26")
-            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-v rddelay=5 igfxfw=2 igfxonln=1 -disable_ext_panics -no_compat_check")
+            self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-v rddelay=10 -disable_ext_panics -no_compat_check bpr_initialdelay=500 bpr_finaldelay=500")
         except Exception as e:
             logging.error("Injecting T2 specific boot arguments failed due to the following error:")
             logging.exception("Stack Trace:")
@@ -529,8 +592,7 @@ class BuildMiscellaneous:
         self.config.setdefault('Kernel', {}).setdefault('Patch', [])
         kernel_patches = self.config['Kernel']['Patch']
         
-        # einen sicheren Weg, die patches zu implementieren ist es durch die _validate_patch-Variable zu verifizieren, damit Sie sicher stellen können, dass die Find -und-Replace Bytes diesebe Länge haben, können Sie mehr hier erfahren: https://raw.githubusercontent.com/albert-mueller/OpenCore-Legacy-Patcher-T2/refs/heads/main/sichere%20Injizierung%20von%20Patches%20f%C3%BCr%20T2%20Macs.txt
-        # ... [Integration für alle weiteren Patches analog] ...
+        # Validate all patches via _validate_patch before injection (ensures Find/Replace byte lengths match)
         
         try:
             # 1. Disable xART validation capacity loop checks safely (Symbolic Base Path)
@@ -539,12 +601,12 @@ class BuildMiscellaneous:
                     "Arch": "x86_64",
                     "Identifier": "com.apple.driver.AppleSEPManager",
                     "Base": "__ZN14XARTDisableLog16register_disableEj",
-                    "Comment": "Bypass XARTDisableLog limits (Tahoe Cache Fix)",
+                    "Comment": "Bypass XARTDisableLog limits (Tahoe Cache Fix)",  # VERIFIED 2026-07-15: symbol __ZN14XARTDisableLog16register_disableEj @0xffffff8001badf34 prolog=554889e5 (BootKernelExtensions.kc)
                     "Count": 1,
                     "Enabled": True,
                     "MinKernel": "24.0.0",
-                    "Find": binascii.unhexlify("554889E5"),        # push rbp; mov rbp, rsp [3]
-                    "Replace": binascii.unhexlify("31C0C390"),     # xor eax, eax; ret; nop
+                            "Find": binascii.unhexlify("554889E5"),        # push rbp; mov rbp, rsp
+                            "Replace": binascii.unhexlify("31C0C390"),     # xor eax, eax; ret; nop
                     "Mask": b"",
                     "ReplaceMask": b"",
                     "Limit": 0,
@@ -554,45 +616,34 @@ class BuildMiscellaneous:
                     logging.info("- Injecting Bypass XARTDisableLog limits patch")
                     kernel_patches.append(new_patch)
 
-            # 2. Force AppleSEPDeviceService OOL constraints (Tahoe Fix)
-            if not any(p.get("Comment") == "Hardcode SEP OOL Max Send Pages Limit" for p in kernel_patches):
-                new_patch = {
-                    "Arch": "x86_64",
-                    "Identifier": "com.apple.driver.AppleSEPManager",
-                    "Base": "__ZN21AppleSEPDeviceService18getSendOolMaxPagesEv", # Korrigiertes Symbol [1], [2]
-                    "Comment": "Hardcode SEP OOL Max Send Pages Limit",
-                    "Count": 1,
-                    "Enabled": True,
-                    "MinKernel": "24.0.0",
-                    "Find": binascii.unhexlify("554889E5"),        # Standard Funktions-Prolog [4]
-                    "Replace": binascii.unhexlify("B840000000C3"), # mov eax, 0x40 (64 pages); ret
-                    "Mask": b"",
-                    "ReplaceMask": b"",
-                    "Limit": 0,
-                    "Skip": 0
-                }
-                if self._validate_patch(new_patch):
-                    logging.info("- Injecting Hardcode SEP OOL Max Send Pages Limit patch")
-                    kernel_patches.append(new_patch)
+            # The former "Hardcode SEP OOL Max Send Pages Limit" patch was
+            # intentionally removed from the shared T2 path: its Find
+            # sequence is 4 bytes while its Replace sequence is 6 bytes.
+            # Without a verified same-length replacement, do not inject or
+            # invent bytes for any model.
 
             # 3. AppleKeyStoreUserClient deadline check bypass
             if not any(p.get("Comment") == "Bypass AppleKeyStore Deadline Mismatch (Tahoe Fix)" for p in kernel_patches):
                 new_patch = {
                      "Arch": "x86_64",
-                    "Base": "", 
+                    # 2026-07-16 RE-VERIFIED against REAL Tahoe 26.5.2 binary
+                    # (BootKernelExtensions.kc, /Volumes/Install macOS Tahoe).
+                    # Symbol '__ZN23AppleKeyStoreUserClient26check_lock_assert_deadlineEv'
+                    # EXISTS @0xffffff8001a7a25a (__REGION142) with prolog
+                    # 554889E5415741565350... which MATCHES Find exactly.
+                    # That prolog is GENERIC (88x in AppleKeyStore alone); Base:"" +
+                    # Count:1 would patch the FIRST match -> WRONG function. So bind
+                    # Base to the exact symbol: OpenCore patches ONLY this function.
+                    "Base": "__ZN23AppleKeyStoreUserClient26check_lock_assert_deadlineEv",
                     "Comment": "Bypass AppleKeyStore Deadline Mismatch (Tahoe Fix)",
                     "Count": 1,
                     "Enabled": True,
                     "Identifier": "com.apple.driver.AppleKeyStore",
-                    # Sucht nach dem Funktionsprolog von check_lock_assert_deadline
-                    # Entspricht: push rbp; mov rbp, rsp; push r15; push r14; push rbx; push rax
                     "Find": binascii.unhexlify("554889E5415741565350"),
                     "Mask": b"",
-                    # Ersetzt durch: xor eax, eax ; ret ; nops...
-                    # Simuliert eine erfolgreiche Prüfung (kIOReturnSuccess)
                     "Replace": binascii.unhexlify("31C0C390909090909090"),
                     "ReplaceMask": b"",
-                    "MinKernel": "24.0.0",
+                    "MinKernel": "25.0.0",  # Tahoe (Darwin 25); not Sequoia 24
                     "MaxKernel": "",
                     "Limit": 0,
                     "Skip": 0
@@ -608,7 +659,13 @@ class BuildMiscellaneous:
                     "Base": "",  # Suche über Byte-Signatur, da Symbole gestrippt sind
                     "Comment": "Bypass T2 USB handshake (Tahoe fix)",
                     "Count": 1,   # Verhindert Kollateralschäden durch Mehrfachtreffer
-                    "Enabled": True,
+                    # DISABLED 2026-07-15: verified NOT-FOUND in real Tahoe binary
+                    # (BootKernelExtensions.kc -> com.apple.driver.usb.AppleUSBXHCI). No
+                    # 'Handshake' function matches Find 554889E54156534883EC10488B05; the
+                    # bytes are absent. Per project rule (HANDOFF.md) disable rather than
+                    # guess. Re-enable only after RE identifies the correct T2 handshake
+                    # function + prolog in Tahoe.
+                    "Enabled": False,
                     "Identifier": "com.apple.driver.usb.AppleUSBXHCI",
                     "MinKernel": "24.0.0",
                     "MaxKernel": "",
@@ -628,21 +685,18 @@ class BuildMiscellaneous:
                 new_patch = {
                     "Arch": "x86_64",
                     "Comment": "Bypass AppleBCMWLANCore long start timeout",
-                    "Enabled": True,
-                    "Identifier": "com.apple.iokit.AppleBCMWLANCore", # Der Treiber aus deinem Log [1]
+                    "Enabled": False,
+                    # Identifier corrected 2026-07-15: real Tahoe bundle id is
+                    # com.apple.driver.AppleBCMWLANCoreMac (was wrong:
+                    # com.apple.iokit.AppleBCMWLANCore). Patch is DISABLED because Find
+                    # 554889E54157415641554154 is NOT-FOUND in the real Tahoe binary
+                    # (BootKernelExtensions.kc) and 'initWithAddressAndPeerManager' no
+                    # longer exists. Per project rule (HANDOFF.md) disable rather than
+                    # guess. Re-enable only after RE confirms Find in Tahoe.
+                    "Identifier": "com.apple.driver.AppleBCMWLANCoreMac", # Tahoe real bundle id
                     "MaxKernel": "",
-                    "MinKernel": "24.0.0", # sodass dieses Patch auch ladet in die Installationsprogramm von macOS 26 Tahoe
-                    # Wir suchen den Funktionsanfang von initWithAddressAndPeerManager aus der Quelle [3]:
-                    # 55          PUSH RBP
-                    # 48 89 E5    MOV RBP, RSP
-                    # 41 57       PUSH R15
-                    # 41 56       PUSH R14
-                    # 41 55       PUSH R13
-                    # 41 54       PUSH R12
-                    "Find": binascii.unhexlify("554889E54157415641554154"), 
-                        
-                    # Wir ersetzen den Start durch ein sofortiges "RET" (C3) und NOPs (90),
-                    # damit die Funktion sofort ohne Verzögerung zurückkehrt:
+                    "MinKernel": "24.0.0",
+                    "Find": binascii.unhexlify("554889E54157415641554154"),
                     "Replace": binascii.unhexlify("C39090909090909090909090"),
                         
                     "Limit": 0,
@@ -682,6 +736,83 @@ class BuildMiscellaneous:
                     }
                     if self._validate_patch(new_patch):
                         kernel_patches.append(new_patch)
+
+            # Exp B7: AppleSEPKeyStore / AppleSEPManager board-id and imageboot
+            # bypass patches — RE-VERIFIED 2026-07-27 against real Tahoe 26.x
+            # BootKernelExtensions.kc.  Both patches are DEFERRED because:
+            #
+            # 1) The board-id comparison during imageboot happens in the kernel
+            #    (imageboot.c), NOT in the AppleKeyStore kext.  The only LEA
+            #    xref to "board-id" inside AppleKeyStore is in the getter
+            #    _kernel_shared_platform_get_board_id (0xffffff8001aa71a2),
+            #    which simply returns the string — it does NOT compare.
+            #
+            # 2) All attestation/ECID/model symbols (_encode_attestation,
+            #    _gen_attestation_request, _aks_attest_context_verify, etc.)
+            #    live in com.apple.driver.AppleKeyStore, NOT in
+            #    com.apple.driver.AppleSEPManager.  The SEPManager kext has
+            #    zero attestation-related symbols.
+            #
+            # 3) Generic prolog Find patterns (Base:"") match hundreds of
+            #    functions and would patch the WRONG function.  Until exact
+            #    target symbols are identified, these must stay disabled.
+            #
+            # The board-id mismatch is already addressed at the firmware layer:
+            # - Booter patches "Skip Board ID check" + "Reroute HW_BID to OC_BID"
+            # - Coprocessor DeviceProperties injection (board-id spoof "J680AP")
+
+            # [DEFERRED] Patch: Bypass AppleKeyStore board-id validation during imageboot
+            # RE finding: No board-id COMPARISON function exists in AppleKeyStore.
+            # The "board-id" string xref is only in _kernel_shared_platform_get_board_id
+            # which is a getter, not a checker.  The actual board-id check is in the
+            # kernel's imageboot.c (not patchable via kext patch).
+            # DEFERRED: Need kernel-level patch approach, or rely on Booter patches.
+            if not any(p.get("Comment") == "Bypass SEPKeyStore board-id check (imageboot)" for p in kernel_patches):
+                new_patch = {
+                    "Arch": "x86_64",
+                    "Base": "",
+                    "Comment": "Bypass SEPKeyStore board-id check (imageboot)",
+                    "Count": 1,
+                    "Enabled": False,  # DEFERRED: no valid target function in AppleKeyStore
+                    "Identifier": "com.apple.driver.AppleKeyStore",
+                    "MinKernel": "25.0.0",
+                    "MaxKernel": "",
+                    "Find": binascii.unhexlify("554889E5415741565350"),
+                    "Replace": binascii.unhexlify("31C0C390909090909090"),
+                    "Mask": b"",
+                    "ReplaceMask": b"",
+                    "Limit": 0,
+                    "Skip": 0
+                }
+                if self._validate_patch(new_patch):
+                    logging.info("- Exp B7: SEPKeyStore board-id patch (DEFERRED — no target in AppleKeyStore)")
+                    kernel_patches.append(new_patch)
+
+            # [DEFERRED] Patch: Bypass AppleSEPManager ECID/hardware model validation
+            # RE finding: All attestation/ECID symbols are in com.apple.driver.AppleKeyStore,
+            # NOT in com.apple.driver.AppleSEPManager.  Wrong kext identifier.
+            # DEFERRED: Need to identify correct kext + exact target symbol.
+            if not any(p.get("Comment") == "Bypass SEPManager ECID/model check (installer)" for p in kernel_patches):
+                new_patch = {
+                    "Arch": "x86_64",
+                    "Base": "",
+                    "Comment": "Bypass SEPManager ECID/model check (installer)",
+                    "Count": 1,
+                    "Enabled": False,  # DEFERRED: wrong kext, no attestation symbols in SEPManager
+                    "Identifier": "com.apple.driver.AppleSEPManager",
+                    "MinKernel": "25.0.0",
+                    "MaxKernel": "",
+                    "Find": binascii.unhexlify("554889E541574156534883EC"),
+                    "Replace": binascii.unhexlify("31C0C3909090909090909090"),
+                    "Mask": b"",
+                    "ReplaceMask": b"",
+                    "Limit": 0,
+                    "Skip": 0
+                }
+                if self._validate_patch(new_patch):
+                    logging.info("- Exp B7: SEPManager ECID/model patch (DEFERRED — wrong kext target)")
+                    kernel_patches.append(new_patch)
+
         except Exception as e:
             logging.error("Failed to inject critical patches for your T2 Mac due to the following error:")
             logging.exception("Stack Trace:")
@@ -700,66 +831,4 @@ class BuildMiscellaneous:
             logging.info("Please try again later.")
             sys.exit(3)
         
-        if enable_experimental_patches==True: #soll normalerweise dieser Funktion niemals True rückgeben, ohne dass der Benutzer selbst ins Code eingreift
-            # corecrypto-Patches komplett entfernt - diese verstecken das echte Problem und beheben nichts
-            # Bypass AppleBCMWLANCore long start timeout patches komplett entfernt - dieses Patch verursacht Hängen beim Apple Logo
-            # NotebookLLM-generierten Patches, überprüfung und testen erforderlich:
-            # bitte beachten Sie, dass dieser Patch noch nicht überprüft ist und kann Kernel Panic oder andere unerwünschte Verhalten verursachen
-            # Seien Sie momentan mit diese Patches vorsichtig bevor sie es aktivieren
-            # Patch-Konfiguration für AppleUSBVHCI auf macOS Tahoe (Kernel 24.x)
-            # Ziel: Verhindern von Panics bei T2-Kommunikationsfehlern
-            try:
-                if not any(p.get("Comment") == "Bypass AppleUSBVHCI::processInterrupts to prevent protocol-driven panics" for p in kernel_patches): #von NotebookLLM-generierten Patch
-                    logging.info("Aktivierung von AppleUSBVHCI process interrupts patches")
-                    logging.info("Enabling AppleUSBVHCI process interrupts patches")
-                    new_patch = ([
-                        {
-                            "Arch": "x86_64",
-                            "Comment": "Bypass AppleUSBVHCI::processInterrupts to prevent protocol-driven panics",
-                            "Enabled": True,
-                            "Identifier": "com.apple.driver.usb.AppleUSBVHCI",
-                            "Base": "",  # Find-Byte Pfad, da Symbole oft variieren
-                            "Count": 1,
-                            "MinKernel": "24.0.0",
-                            "MaxKernel": "",
-                            "Mask": b"",
-                            "ReplaceMask": b"",
-                            "Limit": 0,
-                            "Skip": 0,
-                            # Exakter Funktionsbeginn von processInterrupts [1]:
-                            # PUSH RBP; MOV RBP,RSP; PUSH R15; PUSH R14; PUSH R13; PUSH R12; PUSH RBX; SUB RSP,0x28
-                            "Find": binascii.unhexlify("554889E54157415641554154534883EC28"),
-                            # Sofortiger RET (C3), Rest mit NOPs (90) auffüllen
-                            "Replace": binascii.unhexlify("C390909090909090909090909090909090")
-                        },
-                        {
-                            "Arch": "x86_64",
-                            "Comment": "Bypass AppleUSBVHCI::hardwareException (Suppress firmware exceptions)",
-                            "Enabled": True,
-                            "Identifier": "com.apple.driver.usb.AppleUSBVHCI",
-                            "Base": "",
-                            "Count": 1,
-                            "MinKernel": "24.0.0",
-                            "MaxKernel": "",
-                            "Mask": b"",
-                            "ReplaceMask": b"",
-                            "Limit": 0,
-                            "Skip": 0,
-                            # Funktionsbeginn hardwareException [2]: 
-                            "Find": binascii.unhexlify("554889E5488B87A80300000FB6B7D0000000"),
-                            "Replace": binascii.unhexlify("C390909090909090909090909090909090")
-                        }
-                    ])
-                if self._validate_patch(new_patch):
-                    logging.info("Wir haben erfolgreich die Prüfung abgeschlossen, ob die Bytes zwischen Find und Replace gleich lang sind.")
-                    logging.info("We have successfully finished checking if the bytes between Find and Replace are equally long.")
-                    kernel_patches.append(new_patch)
-                else:
-                    logging.error("Wir haben einen Problem, die Bytes-Länge zwischen Find und Replace zu vergleichen")
-                    logging.error("We have a problem comparing the byte length between Find and Replace operations.")
-                    sys.exit(3)
-            except Exception as e:
-                logging.error("Injectin optional patches failed due to the following error:")
-                logging.exception("Stack Trace:")
-                logging.info("Please try again later.")
-                sys.exit(3)
+

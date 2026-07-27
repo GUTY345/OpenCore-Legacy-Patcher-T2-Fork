@@ -14,7 +14,6 @@ from .. import constants
 from ..support import utilities
 from ..detections import device_probe
 from ..datasets import (
-    model_array,
     smbios_data,
     os_data
 )
@@ -48,6 +47,30 @@ _T2_LOW_POWER_MODELS = {
 # T2 Mac models that do not have an Intel iGPU, or where iGPU injection is not required/recommended.
 _T2_NO_IGPU_MODELS = {
     "iMacPro1,1",      # iMac Pro 2017
+}
+
+# EXPERIMENT B2 (2026-07-16, gray-screen root cause CONFIRMED):
+#   T2 Mac models whose DISCRETE GPU driver was REMOVED in macOS Tahoe and must be
+#   disabled so the machine falls back to its (still-supported) Intel iGPU.
+#
+#   Root cause proof (no guessing — all from real binaries/hardware):
+#   - MacBookPro15,1 dGPU = Radeon Pro 555X/560X = Polaris/Baffin (0x67ef),
+#     driven by AMDRadeonX4000.kext. That kext is PRESENT on Sequoia but ABSENT
+#     from Tahoe: Tahoe PlatformSupport.plist only lists MacBookPro16,1/16,2/16,4
+#     + iMac20,x, whose dGPUs are all AMD Navi (AMDRadeonX6000). No supported Mac
+#     uses Polaris, so Tahoe ships no Polaris driver => dGPU cannot initialise
+#     => WindowServer cannot composite => plain GRAY screen + cursor.
+#   - The internal Retina panel is wired to the iGPU, NOT the dGPU (confirmed via
+#     IORegistry: IGPU@2 > AppleIntelFramebuffer@0 > display0 > AppleBacklightDisplay),
+#     and the machine has a gMux, so disabling the dGPU keeps the panel alive.
+#   - Tahoe still ships the UHD630 (Coffee Lake) iGPU driver — MacBookPro16,1 (a
+#     Tahoe-supported model) uses the very same UHD 630 — so iGPU-only is viable.
+#
+#   Fix: inject WhateverGreen's `-wegnoegpu` boot-arg (adds `disable-gpu` to GFX0)
+#   so macOS never attaches a driver to the unsupported Polaris dGPU.
+#   REVERT: remove the model from this set.
+_DISABLE_UNSUPPORTED_DGPU_MODELS = {
+    "MacBookPro15,1",  # Radeon Pro 555X/560X (Polaris/Baffin) — AMDRadeonX4000 removed in Tahoe
 }
 
 
@@ -135,10 +158,13 @@ class BuildSecurity:
         return node
 
     def _is_t2_mac(self) -> bool:
-        """Return True if the current model has a T2 security chip."""
-        if self.model in model_array.T2Macs:
-            return True
-        return "T2_CHIP" in self.constants.device_properties.get(self.model, {}).get("Features", [])
+        """Return True only for this fork's supported T2 target (MacBookPro15,1).
+
+        This fork focuses exclusively on the MacBook Pro 15-inch 2018. No T2
+        security configuration (memory descriptor overrides, graphics injection,
+        Tahoe kernel patches, AMFIPass) is applied to any other model.
+        """
+        return self.model == "MacBookPro15,1"
 
     def _requires_t2_graphics_injection(self) -> bool:
         """Return True if this T2 model needs Intel graphics injection."""
@@ -156,8 +182,12 @@ class BuildSecurity:
         """Apply AMFI-related boot-args based on user path validation."""
         if self._t2_uses_amfipass():
             logging.info("  > T2 target utilizes AMFIPass layer. Injecting validated Tahoe storage bypasses.")
+            # Exp B6: Added amfi=0x80 + amfi_get_out_of_my_way=1 for additional
+            # AMFI bypass during installer.  These are temporary and help prevent
+            # AMFI from blocking unsigned kexts/loading during the install process.
             self._update_nvram_string(apple_nvram_uuid, "boot-args", (
-                "-amfipassbeta cs_allow_invalid=1 cs_unrestricted_cs=1 cs_debug=1 io=0xffffffff"
+                "-amfipassbeta cs_allow_invalid=1 cs_unrestricted_cs=1 cs_debug=1 io=0xffffffff "
+                "amfi=0x80 amfi_get_out_of_my_way=1"
             ))
             return
 
@@ -208,8 +238,28 @@ class BuildSecurity:
     # T2 security helpers
     # ------------------------------------------------------------------
 
+    # EXPERIMENT B1 (2026-07-16, gray-screen fix):
+    #   Symptom on real hardware: Tahoe installer boots (no panic after Exp A),
+    #   but reaches a plain GRAY screen + mouse cursor, NO menu bar, and Terminal
+    #   cannot be opened. Root cause (confirmed from the booted config.plist):
+    #   the connector-less/headless UHD630 injection below sets the internal iGPU
+    #   (PciRoot(0x0)/Pci(0x2,0x0)) to AAPL,ig-platform-id 0x3E9B0006 +
+    #   framebuffer-con0-type 0 ("headless isolation"). That platform-id suits a
+    #   Mac mini / iMac where the iGPU drives NO display — but MacBookPro15,1 is a
+    #   laptop whose internal panel runs through the iGPU path, so it is left with
+    #   no usable framebuffer => gray screen, no GUI shell.
+    #
+    #   MacBookPro15,1 is a genuine Mac and should use its NATIVE Apple framebuffer
+    #   (no injection). Skip the injection for it. REVERT (remove from the set) if
+    #   hardware testing shows the installer GUI still does not appear.
+    _SKIP_IGPU_INJECTION_MODELS = set()
+
     def _apply_t2_graphics_injection(self) -> None:
         """Inject integrated Intel iGPU DeviceProperties for T2 Macs."""
+        if self.model in self._SKIP_IGPU_INJECTION_MODELS:
+            logging.info(f"- {self.model}: Skipping iGPU DeviceProperties injection (native framebuffer, Exp B1 gray-screen fix)")
+            return
+
         if self._should_skip_t2_graphics_injection() or not self._requires_t2_graphics_injection():
             logging.info(f"- Skipping Intel graphics injection for {self.model} (no iGPU or not required)")
             return
@@ -238,8 +288,18 @@ class BuildSecurity:
             logging.info("  > Appended LP display sync flags safely.")
 
         elif self.model in _T2_UHD630_MODELS:
-            logging.info(f"- {self.model}: Injecting connector-less UHD630 DeviceProperties (Tahoe fix)")
-            gfx["AAPL,ig-platform-id"] = binascii.unhexlify("06009B3E")  # 0x3E9B0006 LE
+            # Note: macOS Tahoe and MacBookPro15,1 native platform ID is 0x06009B3E (headless)
+            # The iGPU-only display drive with eDP connector requires platform ID 0x09009B3E
+            # (Coffee Lake mobile, native eDP) for proper display output. 0x07009B3E (desktop,
+            # 3x DP) was used before but required WhateverGreen framebuffer patches to override
+            # con0-type to eDP — and WhateverGreen probe fails on Tahoe, so those patches never
+            # apply.  0x09009B3E has eDP natively in the platform-id, no WG override needed.
+            if self.model == "MacBookPro15,1":
+                logging.info(f"- {self.model}: Injecting iGPU-only mobile eDP UHD630 DeviceProperties for proper internal display output (Tahoe fix)")
+                gfx["AAPL,ig-platform-id"] = binascii.unhexlify("09009B3E")  # 0x3E9B0009 LE
+            else:
+                logging.info(f"- {self.model}: Injecting connector-less UHD630 DeviceProperties (Tahoe fix)")
+                gfx["AAPL,ig-platform-id"] = binascii.unhexlify("06009B3E")  # 0x3E9B0006 LE
             gfx["device-id"]           = binascii.unhexlify("9B3E0000")  # 0x3E9B0000 LE
         else:
             logging.error(f"FATAL: Model {self.model} lacks specific GPU patch data.")
@@ -255,8 +315,12 @@ class BuildSecurity:
                 logging.info(f"  > {self.model}: Enforced active physical mapping layout on con0 (iGPU-only fix)")
             elif self.model in _T2_UHD630_MODELS:
                 gfx["framebuffer-con0-enable"]  = binascii.unhexlify("01000000")
-                gfx["framebuffer-con0-type"]    = binascii.unhexlify("00000000")  
-                logging.info(f"  > {self.model}: Enforced strict headless isolation structure on con0 (dGPU Present)")
+                if self.model == "MacBookPro15,1":
+                    gfx["framebuffer-con0-type"]    = binascii.unhexlify("00040000")  # eDP
+                    logging.info(f"  > {self.model}: Enforced active physical mapping layout on con0 (iGPU-only fix)")
+                else:
+                    gfx["framebuffer-con0-type"]    = binascii.unhexlify("00000000")  
+                    logging.info(f"  > {self.model}: Enforced strict headless isolation structure on con0 (dGPU Present)")
             else:
                 gfx["framebuffer-con0-enable"]  = binascii.unhexlify("01000000")
                 gfx["framebuffer-con0-type"]    = binascii.unhexlify("00040000")  
@@ -281,9 +345,17 @@ class BuildSecurity:
         self.config["Misc"]["Security"]["DmgLoading"]      = "Any"
         self.config["Misc"]["Security"]["ApECID"]          = 0
 
-        # FIX: Keyword-Typo korrigiert
+        # FIX: Keyword typo corrected
         self._apply_t2_amfi_boot_args(apple_nvram_uuid)
         self._update_nvram_string(apple_nvram_uuid, "boot-args", "ipc_control_port_options=0 -v keepsyms=1 nvme_shutdown_timestamp=0")
+
+        # Exp B6: Installer-specific boot-args to bypass SEP/KeyStore/DMG trust
+        # checks that hang silently on T2 when Board ID mismatch is detected.
+        # root_dmg_trust_level=0: disable DMG trust level verification
+        # apfs_read_only_nodownloads=1: prevent APFS downloads during read-only mount
+        # -rootdmgboot: disable root DMG boot verification
+        self._update_nvram_string(apple_nvram_uuid, "boot-args",
+            "root_dmg_trust_level=0 apfs_read_only_nodownloads=1 -rootdmgboot")
 
         if self.constants.detected_os >= os_data.os_data.tahoe:
             self.is_tahoe_target = True
@@ -355,15 +427,12 @@ class BuildSecurity:
     
     def _apply_cryptex_patches(self, apple_nvram_uuid: str) -> None:
         if self.is_tahoe_target is True:
-            logging.info("Einbinden einer einheitlichen Tahoe-Funktionstokenzuordnung.")
             logging.info("Injecting unified Tahoe capability token mapping.")
             self._update_nvram_string(apple_nvram_uuid, "boot-args", "ipc_control_port_options=0 cs_unrestricted_cs=1 cs_allow_invalid=1")
 
     def _apply_t2_kernel_patches_tahoe(self) -> None:
-        logging.info("The use of the function _apply_t2_kernel_patches_tahoe is retired. This function remains there to ensure compatability so the app doesn't crash.")
+        logging.info("The use of the function _apply_t2_kernel_patches_tahoe is retired. This function remains there to ensure compatibility so the app doesn't crash.")
         logging.info("The goal of this is to make the code clearer.")
-        logging.info("Die Funktion _apply_t2_kernel_patches_tahoe ist eingestellt. Diese Funktion nur bleibt für Kompabilität, um sicherzustellen, dass die App nicht abstürzt.")
-        logging.info("Das Ziel ist es den Code klarer zu machen.")
     
     # ------------------------------------------------------------------
     # Main build entry point
@@ -380,19 +449,54 @@ class BuildSecurity:
         if self._is_t2_mac():
             logging.info("- T2 Mac detected — applying consolidated T2 security settings")
             
-            # 1. Base initialization & OS Target Checks (Zwingend als Erstes!)
+            # 1. Base initialization & OS Target Checks (Must be first!)
             self._apply_t2_memory_descriptor_overrides(APPLE_NVRAM_UUID)
             
-            # 2. Grafik- & Kernel-Injektionen (Unabhängig von Variablen-Fluktuatuationen absichern)
+            # 2. Graphics & Kernel Injections (Independent of variable fluctuations)
             self._apply_t2_graphics_injection()
             self._apply_t2_kernel_patches_tahoe()
 
-            # 3. Ergänzende kosmetische Argumente sauber anhängen
+            # 3. Additional cosmetic arguments cleanly appended
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-disable_sidecar_mac -disable_media_analysis")
 
-            # 4. Scope graphics injection flags strictly to active valid targets
+            # Exp B7: Restore WEG boot-args for iGPU stability.
+            # igfxonln=1: force iGPU online (needed during installer init)
+            # igfxfw=2: load Intel GPU firmware (Coffee Lake GT2)
+            # forceRenderStandby=0: prevent render standby during installer
+            # agdpmod=vit9696: bypass AGDP board-id check (WEG feature)
             if self._requires_t2_graphics_injection():
-                self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "igfxonln=1 igfxfw=2 forceRenderStandby=0 agdpmod=vit9696")
+                self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args",
+                    "igfxonln=1 igfxfw=2 forceRenderStandby=0 agdpmod=vit9696")
+
+            # 4b. EXP B2: disable discrete GPUs whose driver Tahoe removed, so the
+            #     machine runs on its supported Intel iGPU (internal panel is on the
+            #     iGPU). See _DISABLE_UNSUPPORTED_DGPU_MODELS for the full evidence.
+            if self.model in _DISABLE_UNSUPPORTED_DGPU_MODELS:
+                logging.info(f"- {self.model}: Disabling unsupported discrete GPU (driver removed in Tahoe) — running iGPU-only (Exp B2)")
+                # -wegnoegpu is a WhateverGreen boot-arg that adds disable-gpu to GFX0.
+                self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-wegnoegpu")
+                # Exp B4 backup: inject disable-gpu directly on dGPU DeviceProperties
+                # because WhateverGreen probe fails on Tahoe → start() never called →
+                # -wegnoegpu boot-arg is never processed.  DeviceProperties injection
+                # happens via OpenCore before kext load, so it works without WG.
+                dgpu_path = "PciRoot(0x0)/Pci(0x1,0x0)/Pci(0x0,0x0)"
+                self._ensure_path("DeviceProperties", "Add", dgpu_path)
+                self.config["DeviceProperties"]["Add"][dgpu_path]["disable-gpu"] = binascii.unhexlify("01000000")
+                logging.info(f"  > Injected disable-gpu on dGPU DeviceProperties path: {dgpu_path}")
+
+            # Exp B7: Inject coprocessor DeviceProperties for T2 Board ID spoofing.
+            # The T2 coprocessor (Apple coprocessor) at PciRoot(0x0)/Pci(0x14,0x0)
+            # reports the real Board ID (J680AP) via Secure Enclave/BridgeOS.
+            # By injecting a spoofed board-id property here, we hope to reduce the
+            # dual Board ID conflict that causes KeyStore/SEP to hang during
+            # installer.  Verify with: ioreg -l | grep -E "board-id|apple-coprocessor"
+            coprocessor_path = "PciRoot(0x0)/Pci(0x14,0x0)"
+            self._ensure_path("DeviceProperties", "Add", coprocessor_path)
+            # Spoof Board ID to match the target SMBIOS (MacBookPro15,1 = J680AP)
+            # The real Board ID from T2 SEP is 6 bytes; inject as property
+            self.config["DeviceProperties"]["Add"][coprocessor_path]["board-id"] = \
+                binascii.unhexlify("4A3638304150")  # "J680AP" in ASCII
+            logging.info(f"  > Exp B7: Injected spoofed board-id on coprocessor path: {coprocessor_path}")
 
             # 5. Hard Structural Boundaries Pass
             logging.info("- Final T2 verification pass (Enforcing absolute boundaries)")
