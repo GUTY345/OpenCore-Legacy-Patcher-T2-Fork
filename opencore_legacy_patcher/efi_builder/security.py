@@ -49,7 +49,7 @@ _T2_NO_IGPU_MODELS = {
     "iMacPro1,1",      # iMac Pro 2017
 }
 
-# EXPERIMENT B2 (2026-07-16, gray-screen root cause CONFIRMED):
+#   (2026-07-16, gray-screen root cause CONFIRMED):
 #   T2 Mac models whose DISCRETE GPU driver was REMOVED in macOS Tahoe and must be
 #   disabled so the machine falls back to its (still-supported) Intel iGPU.
 #
@@ -182,7 +182,7 @@ class BuildSecurity:
         """Apply AMFI-related boot-args based on user path validation."""
         if self._t2_uses_amfipass():
             logging.info("  > T2 target utilizes AMFIPass layer. Injecting validated Tahoe storage bypasses.")
-            # Exp B6: Added amfi=0x80 + amfi_get_out_of_my_way=1 for additional
+            # Added amfi=0x80 + amfi_get_out_of_my_way=1 for additional
             # AMFI bypass during installer.  These are temporary and help prevent
             # AMFI from blocking unsigned kexts/loading during the install process.
             self._update_nvram_string(apple_nvram_uuid, "boot-args", (
@@ -238,7 +238,7 @@ class BuildSecurity:
     # T2 security helpers
     # ------------------------------------------------------------------
 
-    # EXPERIMENT B1 (2026-07-16, gray-screen fix):
+    #  (2026-07-16, gray-screen fix):
     #   Symptom on real hardware: Tahoe installer boots (no panic after Exp A),
     #   but reaches a plain GRAY screen + mouse cursor, NO menu bar, and Terminal
     #   cannot be opened. Root cause (confirmed from the booted config.plist):
@@ -349,7 +349,7 @@ class BuildSecurity:
         self._apply_t2_amfi_boot_args(apple_nvram_uuid)
         self._update_nvram_string(apple_nvram_uuid, "boot-args", "ipc_control_port_options=0 -v keepsyms=1 nvme_shutdown_timestamp=0")
 
-        # Exp B6: Installer-specific boot-args to bypass SEP/KeyStore/DMG trust
+        # Installer-specific boot-args to bypass SEP/KeyStore/DMG trust
         # checks that hang silently on T2 when Board ID mismatch is detected.
         # root_dmg_trust_level=0: disable DMG trust level verification
         # apfs_read_only_nodownloads=1: prevent APFS downloads during read-only mount
@@ -444,7 +444,7 @@ class BuildSecurity:
         OCLP_NVRAM_UUID  = "4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"
 
         # ==============================================================
-        # Branch A: T2 Mac Consolidated Security Configuration
+        # T2 Mac Consolidated Security Configuration
         # ==============================================================
         if self._is_t2_mac():
             logging.info("- T2 Mac detected — applying consolidated T2 security settings")
@@ -459,7 +459,7 @@ class BuildSecurity:
             # 3. Additional cosmetic arguments cleanly appended
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-disable_sidecar_mac -disable_media_analysis")
 
-            # Exp B7: Restore WEG boot-args for iGPU stability.
+            # Restore WEG boot-args for iGPU stability.
             # igfxonln=1: force iGPU online (needed during installer init)
             # igfxfw=2: load Intel GPU firmware (Coffee Lake GT2)
             # forceRenderStandby=0: prevent render standby during installer
@@ -468,14 +468,14 @@ class BuildSecurity:
                 self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args",
                     "igfxonln=1 igfxfw=2 forceRenderStandby=0 agdpmod=vit9696")
 
-            # 4b. EXP B2: disable discrete GPUs whose driver Tahoe removed, so the
+            # 4b. disable discrete GPUs whose driver Tahoe removed, so the
             #     machine runs on its supported Intel iGPU (internal panel is on the
             #     iGPU). See _DISABLE_UNSUPPORTED_DGPU_MODELS for the full evidence.
             if self.model in _DISABLE_UNSUPPORTED_DGPU_MODELS:
                 logging.info(f"- {self.model}: Disabling unsupported discrete GPU (driver removed in Tahoe) — running iGPU-only (Exp B2)")
                 # -wegnoegpu is a WhateverGreen boot-arg that adds disable-gpu to GFX0.
                 self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-wegnoegpu")
-                # Exp B4 backup: inject disable-gpu directly on dGPU DeviceProperties
+                # backup: inject disable-gpu directly on dGPU DeviceProperties
                 # because WhateverGreen probe fails on Tahoe → start() never called →
                 # -wegnoegpu boot-arg is never processed.  DeviceProperties injection
                 # happens via OpenCore before kext load, so it works without WG.
@@ -484,7 +484,7 @@ class BuildSecurity:
                 self.config["DeviceProperties"]["Add"][dgpu_path]["disable-gpu"] = binascii.unhexlify("01000000")
                 logging.info(f"  > Injected disable-gpu on dGPU DeviceProperties path: {dgpu_path}")
 
-            # Exp B7: Inject coprocessor DeviceProperties for T2 Board ID spoofing.
+            # Inject coprocessor DeviceProperties for T2 Board ID spoofing.
             # The T2 coprocessor (Apple coprocessor) at PciRoot(0x0)/Pci(0x14,0x0)
             # reports the real Board ID (J680AP) via Secure Enclave/BridgeOS.
             # By injecting a spoofed board-id property here, we hope to reduce the
@@ -507,7 +507,7 @@ class BuildSecurity:
             logging.info("  > Final T2 verification complete. ")
 
         # ==============================================================
-        # Branch B: Non-T2 Mac Configuration (PROTECTED VIA ELSE)
+        # Non-T2 Mac Configuration (PROTECTED VIA ELSE)
         # ==============================================================
         else:
             logging.info("- Non-T2 Mac detected — isolating legacy environment execution chain")

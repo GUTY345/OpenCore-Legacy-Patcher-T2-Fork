@@ -487,7 +487,12 @@ class BuildMiscellaneous:
         """T2 Security Chip Handler."""
         if not self._is_t2_mac():
             return
-        enable_experimental_patches = True  # Exp B7: Enabled for T2 board-id/Image4 RE experiments
+        # 2026-07-27: Disabled the VHCI experimental patches.
+        # Boot was freezing right after AppleUSBVHCI port registration on
+        # MacBookPro15,1. processInterrupts was being NOPed which broke USB
+        # interrupt handling completely. Turning these off to verify that's
+        # what's causing the hang before reworking the patches.
+        enable_experimental_patches = False
         logging.info("If you want to enable optional patches that haven't been tested yet, you should download go to releases")
         logging.info(", then download the zip file, extract it, and then, open up misc.py.")
         logging.info("And afterwards, you need manually to set enable_experimental_patches from False to True")
