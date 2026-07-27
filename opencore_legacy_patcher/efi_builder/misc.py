@@ -461,6 +461,20 @@ class BuildMiscellaneous:
                 f"Cannot measure Find/Replace byte lengths for patch '{comment}': {e}"
             ) from e
 
+        # When a symbolic Base is provided and Find is empty, OpenCore resolves
+        # the function address from the symbol and patches from offset 0 —
+        # there are no literal Find bytes to compare, so skip the length check.
+        base = patch_dict.get("Base", "")
+        if base and find_len == 0:
+            replace_hex = binascii.hexlify(replace_bytes).decode().upper()
+            logging.info(
+                f"[patch-audit] {comment} | "
+                f"Identifier={patch_dict.get('Identifier')} | "
+                f"Base={base} | "
+                f"Find(0B)=<symbol-offset> Replace({replace_len}B)={replace_hex}"
+            )
+            return True
+
         # Length comparison — Find and Replace MUST be the same length.
         if find_len != replace_len:
             logging.error(f"LENGTH ISSUE in '{comment}': "
@@ -742,6 +756,39 @@ class BuildMiscellaneous:
                     }
                     if self._validate_patch(new_patch):
                         kernel_patches.append(new_patch)
+
+            # APFS root hash validation bypass
+            # During Tahoe installer boot we see:
+            #   apfs_extract_root_hash_and_manifest_x86: populate_value_from_memory_descriptor
+            #   for root hash failed: 22
+            #   authenticate_efi_forwarded_roothash: failed with error: Invalid argument (22)
+            # This causes the installer to hang during disk enumeration after
+            # the language selection screen.  Bypassing _authenticate_root_hash
+            # lets the APFS driver skip the T2 Secure Enclave root hash check
+            # that can't succeed on an unsupported USB installer.
+            try:
+                logging.info(f"- {self.model}: Bypassing APFS root hash validation for installer disk enumeration")
+                new_patch = {
+                    "Arch": "x86_64",
+                    "Identifier": "com.apple.filesystems.apfs",
+                    "Base": "_authenticate_root_hash",
+                    "Comment": "Bypass APFS root hash validation for T2 installer",
+                    "Count": 1,
+                    "Enabled": True,
+                    "MinKernel": "24.0.0",
+                    "Find": b"",
+                    "Replace": binascii.unhexlify("B800000000C3"),
+                    "Mask": b"",
+                    "ReplaceMask": b"",
+                    "Limit": 0,
+                    "Skip": 0
+                }
+                if self._validate_patch(new_patch):
+                    logging.info("- Injecting APFS root hash validation bypass patch")
+                    kernel_patches.append(new_patch)
+            except Exception as e:
+                logging.error("Failed to inject APFS root hash validation bypass patch:")
+                logging.exception("Stack Trace:")
 
             # Exp B7: AppleSEPKeyStore / AppleSEPManager board-id and imageboot
             # bypass patches — RE-VERIFIED 2026-07-27 against real Tahoe 26.x
