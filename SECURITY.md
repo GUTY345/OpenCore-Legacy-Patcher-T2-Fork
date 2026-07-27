@@ -17,7 +17,14 @@ Ensure you are running one of the latest up-to-date versions:
 
 | Version | Latest version          |
 | ------- | ------------------ |
-| 4.0.0 | :white_check_mark: |
+| 4.0.0 pre-alpha for alpha 16| :white_check_mark: |
+
+Version 3.1.1 and older are completely unsupported since May 8 2026. No technical support will be provided to anyone including forks that are using versions this old. Some projects may claim they are using 4.0.0 alpha 1 or 4.0.0 alpha 15 while they are using modified 3.0.0 alpha 4.1 without patching the associated vulnerabilities - watch out for these - for these forks, no technical support will be provided as well. How to understand if the version is spoofed?
+1. Click on for example 9 commits or the number of commits that this fork did
+<img width="1712" height="910" alt="Bild 16 07 26 um 18 05" src="https://github.com/user-attachments/assets/7e971f1f-65e2-4c99-b0a9-b2c0f8b0999d" />
+2. Check for commit history - 9 commits and then update constants.py to version 4.0.0 alpha 1 or alpha 15 is suspicious unless they pushed a pull request to their repository.
+Example of version spoofing:
+<img width="1712" height="910" alt="image" src="https://github.com/user-attachments/assets/f114a2e9-a41a-40b6-a8dc-aad2a20bb1d4" />
 
 ## Reporting a Vulnerability
 

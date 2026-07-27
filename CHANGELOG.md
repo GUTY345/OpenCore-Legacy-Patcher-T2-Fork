@@ -1,5 +1,361 @@
 # OpenCore Legacy Patcher T2 changelog / OpenCore Legacy Patcher T2-Änderungsprotokoll
-## 4.0.0.12040 - alpha 15.7:
+## 4.0.0.15915 - 4.0.0 pre-alpha 10.8.6 for alpha 16 / 4.0.0 Voralpha 10.8.6 für Alpha 16 Latest
+This release:
+
+- fixes a bug where upon trying to flash macOS to the USB flash drive, the app crashes completely
+- changes the Support icon from a book to a question mark to make it easier to understand by elderly people, non-techies and first-time OpenCore Legacy Patcher T2 users
+
+Diese Version:
+
+- Behebt einen Fehler, der beim Versuch, macOS auf einen USB-Stick zu flashen, zum vollständigen Absturz der App führte.
+
+- Ändert das Support-Symbol von einem Buch zu einem Fragezeichen, um es für ältere Menschen, technisch weniger versierte Nutzer und OpenCore Legacy Patcher T2-Erstbenutzer verständlicher zu machen.
+
+## 4.0.0.15914 - 4.0.0 pre-alpha 10.8.5 for alpha 16 / 4.0.0 Voralpha 10.8.5 für Alpha 16:
+This release fixes a bug where unconditionally, when downloading macOS through the patcher throws the following errors:
+<img width="1456" height="819" alt="image" src="https://github.com/user-attachments/assets/496984e0-2ad8-4b76-a134-19ccceebcfd7" />
+
+<img width="409" height="407" alt="image" src="https://github.com/user-attachments/assets/2da556f3-db3f-4e8b-bddd-13896a3b6b91" />
+
+Diese Version behebt einen Fehler, der beim Herunterladen von macOS über den Patcher die folgenden Fehlermeldungen ausgibt:
+
+<img width="1456" height="819" alt="image" src="https://github.com/user-attachments/assets/496984e0-2ad8-4b76-a134-19ccceebcfd7" />
+
+<img width="409" height="407" alt="image" src="https://github.com/user-attachments/assets/2da556f3-db3f-4e8b-bddd-13896a3b6b91" />
+
+## 4.0.0.15913 - 4.0.0 pre-alpha 10.8.4 for alpha 16 / 4.0.0 Voralpha 10.8.4 für Alpha 16:
+This release:
+- fixes a bug where unconditionally when trying to download the macOS installer it throws an error:
+
+<img width="1600" height="900" alt="Bildschirmfoto 2026-07-24 um 19 21 54" src="https://github.com/user-attachments/assets/562c22a1-243e-4553-b021-984638cd34a1" />
+
+- fixes a vulnerability where an attacker (or a bad Hackintosh user) could trick a user into spoofing the SMBIOS (for example as Macmini8,1) on a Hackintosh or virtual machine into building OpenCore configs for real Macs, not Hackintoshes to launch DoS and corrupt the OS altogether
+- fixes a vulnerability that lets attackers when failing to download macOS installers, due to the lack of displaying the error inside the Terminal - to launch a ClickFix attack to execute arbitary commands to "fix" the error, which actually results in downloading malware
+
+Diese Version:
+
+- Behebt einen Fehler, der beim Herunterladen des macOS-Installationsprogramms immer zu einer Fehlermeldung führt:
+
+<img width="1600" height="900" alt="Bildschirmfoto 2026-07-24 um 19 21 54" src="https://github.com/user-attachments/assets/562c22a1-243e-4553-b021-984638cd34a1" />
+
+- Behebt eine Sicherheitslücke, durch die ein Angreifer (oder ein Hackintosh-Nutzer mit böswilligen Absichten) einen Benutzer dazu verleiten konnte, das SMBIOS (z. B. als Macmini8,1) auf einem Hackintosh oder einer virtuellen Maschine zu fälschen, um OpenCore-Konfigurationen für echte Macs (nicht Hackintoshs) zu erstellen und so einen Denial-of-Service-Angriff (DoS) durchzuführen und das Betriebssystem vollständig zu beschädigen.
+
+- Behebt eine Sicherheitslücke, die es Angreifern ermöglicht, bei einem fehlgeschlagenen Download des macOS-Installationsprogramms – da die Fehlermeldung im Terminal nicht angezeigt wird – einen ClickFix-Angriff durchzuführen. um beliebige Befehle auszuführen, um den Fehler zu „beheben“, was tatsächlich zum Herunterladen von Schadsoftware führt.
+
+## 4.0.0.15912 - 4.0.0 pre-alpha 10.8.3 for alpha 16 / 4.0.0 Voralpha 10.8.3 für Alpha 16:
+This release:
+- fixes a bug where upon trying to close the app, it crashes
+<img width="1112" height="910" alt="Bildschirmfoto 2026-07-23 um 07 47 38" src="https://github.com/user-attachments/assets/ea28dcfc-0496-4ae9-9fa8-07a79c519b32" />
+- fixes Permission denied bug when trying to install drivers and patches - however this remains to be tested
+
+Both fixed by Claude.
+
+Diese Version:
+
+- Behebt einen Fehler, der beim Schließen der App zum Absturz führte.
+<img width="1112" height="910" alt="Bildschirmfoto 2026-07-23 um 07 47 38" src="https://github.com/user-attachments/assets/ea28dcfc-0496-4ae9-9fa8-07a79c519b32" />
+
+- Behebt einen Fehler, der beim Versuch, Treiber und Patches zu installieren, zu einer Zugriffsverweigerung führte. Dies muss jedoch noch getestet werden.
+
+Beide behoben von Claude.
+
+## 4.0.0.15911 - 4.0.0 pre-alpha 10.8.2 for alpha 16 / 4.0.0 Voralpha 10.8.2 für Alpha 16
+This release fixes a bug where upon clicking Install Drivers and patches, the button crashes. This bug is fixed using Claude AI with Sonnet 5 Extra and configured a plugin called Composio, so if there is any bug that I or our contributors can't solve at all, with this plugin and Claude I can fix bugs.
+
+Diese Version behebt einen Fehler, der beim Klicken auf „Install drivers and patches“ zum Absturz der Schaltfläche führte. Dieser Fehler wurde mithilfe von Claude AI mit Sonnet 5 Extra und dem konfigurierten Plugin Composio behoben. Sollte es also einen Fehler geben, den ich oder unsere Mitwirkenden nicht beheben können, kann ich ihn mithilfe dieses Plugins und Claude beheben.
+
+## 4.0.0.15911/old - 4.0.0 pre-alpha 10.8.1 for alpha 16 / 4.0.0 Voralpha 10.8.1 für Alpha 16
+This release fixes a bug where upon trying to open Drivers and patches menu, it crashes.
+
+Diese Version behebt einen Fehler, der zum Absturz des Programms beim Versuch führte, das Menü „Drivers and patches“ zu öffnen.
+
+## 4.0.0.15910 - 4.0.0 pre-alpha 10.8 for alpha 16 / 4.0.0 Voralpha 10.8 für Alpha 16
+Thanks @YBronsk for contributing to this project!
+This release:
+
+- fixes a bug where when downloading PatcherSupportPkg, it may end up visiting the repository instead by accident
+- improves support for Legacy Wireless on macOS 26 Tahoe
+- improves support for macOS 26 Tahoe for Modern Audio
+- improves support for legacy AMD GPUs on macOS 26 Tahoe
+- improves support for AMD Polaris, AMD Navi, AMD Vega GPUs (and improve iMac Pro 2017 GPU support) for macOS 26 Tahoe
+- improves support for Intel Broadwell, Iron Lake and Skylake GPUs for macOS 26 Tahoe
+- Add patches for Metal 31001 GPUs to improve macOS 26 Tahoe support
+
+Vielen Dank an @YBronsk für seinen Beitrag zu diesem Projekt!
+Diese Version:
+
+- Behebt einen Fehler, der beim Herunterladen von PatcherSupportPkg versehentlich zum Repository führen konnte.
+- Verbessert die Unterstützung für ältere WLAN-Verbindungen unter macOS 26 Tahoe.
+- Verbessert die Unterstützung für Modern Audio unter macOS 26 Tahoe.
+- Verbessert die Unterstützung für ältere AMD-GPUs unter macOS 26 Tahoe.
+- Verbessert die Unterstützung für AMD Polaris-, AMD Navi- und AMD Vega-GPUs (sowie die GPU-Unterstützung des iMac Pro 2017) unter macOS 26 Tahoe.
+- Verbessert die Unterstützung für Intel Broadwell-, Iron Lake- und Skylake-GPUs unter macOS 26 Tahoe.
+- Fügt Patches für Metal 31001-GPUs hinzu, um die Unterstützung unter macOS 26 Tahoe zu verbessern.
+
+## 4.0.0.15900.1 - 4.0.0 pre-alpha 10.7.1 for alpha 16 / 4.0.0 Voralpha 10.7.1 für Alpha 16
+This release fixes a bug where Mac users with Apple Silicon can't build EFIs for Intel Macs if they are running macOS 27 Golden Gate. By this bug, currently, only a few testers are impacted.
+
+Dieses Update behebt einen Fehler, der verhindert, dass Mac-Nutzer mit Apple Silicon EFI-Dateien für Intel-Macs erstellen können, wenn sie macOS 27 Golden Gate verwenden. Aktuell sind nur wenige Tester von diesem Fehler betroffen.
+
+## 4.0.0.15900 - 4.0.0 pre-alpha 10.7 for alpha 16 / 4.0.0 Voralpha 10.7 für Alpha 16
+This release:
+
+switches from 4.0.0.random numbers to:
+4.0.0.16000 for alpha 16, for example
+4.0.0.15900 for pre-alpha 16 to indicate that it's released before alpha 16
+fixes a bug where on T2 Macs, duplicate boot arguments were injected that would prevent booting into macOS 26's installer
+fixes a vulnerability where inside gui_macos_installer_flash.py, when it fails to download AutoPkg-Asstes.pkg, it falls back to Nightly, which checks for AutoPkg-Assets.pkg inside GitHub Actions. Like this, an attacker could supply a supply chain attack via a compromised account or a malicious GitHub repository
+fixes a vulnerability where an attacker could supply a malicious update via GitHub Actions by tricking users into downloading 'Nightly' release that is actually malware via a compromised account or a malicious GitHub Repository
+Diese Version:
+
+Wechselt von 4.0.0.random-Nummern zu:
+4.0.0.16000 für Alpha 16, z. B.
+4.0.0.15900 für Pre-Alpha 16, um anzuzeigen, dass sie vor Alpha 16 veröffentlicht wurde
+Behebt einen Fehler, der auf T2-Macs zu doppelten Boot-Argumenten führte und den Start des macOS-26-Installationsprogramms verhinderte
+Behebt eine Sicherheitslücke in gui_macos_installer_flash.py, die dazu führte, dass bei einem Fehler beim Herunterladen von AutoPkg-Assets.pkg auf Nightly zurückgegriffen wurde, welches AutoPkg-Assets.pkg in GitHub Actions prüft. Auf diese Weise könnte ein Angreifer über ein kompromittiertes Konto oder ein manipuliertes GitHub-Repository einen Cyberangriff durchführen.
+– Behebt eine Sicherheitslücke, durch die ein Angreifer über GitHub Actions ein schädliches Update verbreiten konnte, indem er Benutzer dazu verleitete, eine „Nightly“-Version herunterzuladen, die in Wirklichkeit Schadsoftware enthielt. Dies geschah über ein kompromittiertes Konto oder ein manipuliertes GitHub-Repository.
+
+## 4.0.0.13047 - 4.0.0 pre-alpha 10.6.1 for alpha 16 / 4.0.0 Voralpha 10.6.1 für Alpha 16 4.0.0.13046 
+This release:
+dmg_mount.py:
+
+- fixes a bug where if if output.returncode != 0, it would always sys.exit(3)
+- fixes other bugs as well
+
+validation.py:
+
+- if the dmg file for PatcherSupportPkg doesn't exist, there was a bug that would download the wrong PatcherSupportPkg. This is fixed.
+
+Diese Version:
+dmg_mount.py:
+
+- Behebt einen Fehler, der dazu führte, dass bei output.returncode != 0 immer sys.exit(3) aufgerufen wurde.
+
+- Behebt weitere Fehler.
+
+validation.py:
+
+- Falls die DMG-Datei für PatcherSupportPkg nicht existierte, wurde fälschlicherweise das falsche PatcherSupportPkg heruntergeladen. Dieser Fehler wurde behoben.
+
+## 4.0.0.13046 - 4.0.0 pre-alpha 10.6 for alpha 16 / 4.0.0 Voralpha 10.6 für Alpha 16 
+This update contains Python bug fixes
+Dieses Update enthält Fehlerbehebungen für Python
+
+## 4.0.0.13045 - 4.0.0 pre-alpha 10.5 for alpha 16 / 4.0.0 Voralpha 10.5 für Alpha 16 Latest
+Thanks to @nxvid for contributing to this project!
+
+This version fixes a documented issue from a fork that prevented sbvmm from being injected on T2 Macs. The issue is documented here: https://github.com/nxvid/OpenCore-Legacy-Patcher-T2/commit/7888cc23bf4870e6539b746661fea90829e81eed
+
+Danke an @nxvid, dass Sie zu dieser Projekt beigetragen haben!
+Diese Version behebt von einer dokumentierter in einen Fork Problem, der verursacht, nicht sbvmm auf T2 Macs injiziert. Hier ist das Problem dokumentiert: https://github.com/nxvid/OpenCore-Legacy-Patcher-T2/commit/7888cc23bf4870e6539b746661fea90829e81eed
+
+## 4.0.0.13044 - 4.0.0 pre-alpha 10.4 for alpha 16 / 4.0.0 Voralpha 10.4 für Alpha 16
+This releases fixes a bug that may prevent updating OpenCore due to invalid syntax
+Diese Version behebt einen Fehler, der aufgrund ungültiger Syntax die Aktualisierung von OpenCore verhindern konnte
+
+## 4.0.0.13043 - 4.0.0 pre-alpha 10.3 for alpha 16 / 4.0.0 Voralpha 10.3 für Alpha 16
+This release fixes a bug where when closing the app via clicking the red circle or when granting full disk permissions to restart, it crashes.
+Mit dieser Version wird ein Fehler behoben, der zum Absturz der App führte, wenn diese durch Anklicken des roten Kreises geschlossen oder durch Erteilen der Berechtigung für den vollständigen Festplattenzugriff zum Neustart neu gestartet wurde.
+<img width="532" height="407" alt="Bildschirmfoto 2026-07-19 um 23 36 54" src="https://github.com/user-attachments/assets/c5a68310-6133-44a9-81bc-600d3e7d2b55" />
+
+## 4.0.0.13042 - 4.0.0 pre-alpha 10.2 for alpha 16 / 4.0.0 Voralpha 10.2 für Alpha 16
+This release fixes a bug where the window was still saying Nightly.
+Diese Version behebt einen Fehler, bei dem im Fenster immer noch „Nightly“ angezeigt wurde.
+
+## 4.0.0.13041 - 4.0.0 pre-alpha 10.1 for alpha 16 / 4.0.0 Voralpha 10.1 für Alpha 16
+Thanks for @TheRaddish1313 contributing to this project!
+This release:
+- improves KDK handling
+- fixes framebuffer patching issues on T2 Macs
+- implements a temporary workaround for root patching - even if full disk permissions were allowed, it would still ask to enable full disk permissions via System Settings. Now, as a workaround, this release adds Proceed Anyway button, which will let you through.
+- improves boot-args
+- fixes a bug where Sidecar and other continuity features won't work
+- Adds T2-specific NVRAM variables handling
+- enables IOMMU on T2 Macs
+- removes German logs from debugging in the GUI so non-German speaking developers don't get confused
+- fixes the following vulnerabilities:
+install.py:
+- Fixes a security vulnerability that allows attackers to trick an SD card into thinking it's a hard drive when checking whether it's in use, in order to launch DoS attacks to damage it:
+
+        def _determine_sd_card(self, media_name: str):
+                if any(x in media_name for x in ("SD Card", "SD/MMC", "SDXC Reader", "SD Reader", "Card Reader")):
+                    logging.info("You're using an SD card, MMC, SDXC Reader or Card Reader")
+                    return True
+                return False # <- this is a vulnerability
+security.py:
+- fixes a vulnerability that calls a deprecated function. This allows attackers to execute arbitrary code:
+
+            def _apply_t2_kernel_patches_tahoe(self) -> None: # <- this is a vulnerability
+                    logging.info("The use of the function _apply_t2_kernel_patches_tahoe is retired. This function remains there to ensure compatability so the app doesn't crash.")
+                    logging.info("The goal of this is to make the code clearer.")
+                    logging.info("Die Funktion _apply_t2_kernel_patches_tahoe ist eingestellt. Diese Funktion nur bleibt für Kompabilität, um sicherzustellen, dass die App nicht abstürzt.")
+                    logging.info("Das Ziel ist es den Code klarer zu machen.")
+            
+                # ------------------------------------------------------------------
+                # Main build entry point
+            @@ -385,7 +379,6 @@ def _build(self) -> None:
+            
+                        # 2. Grafik- & Kernel-Injektionen (Unabhängig von Variablen-Fluktuatuationen absichern)
+                        self._apply_t2_graphics_injection()
+                        self._apply_t2_kernel_patches_tahoe() # <- this is also a vulnerability
+
+With the next pre-alpha release, 4.0.0.1350, for T2 Macs, patches will be written with Claude instead of NotebookLM due to being known to be buggy, cause gray screens and kernel panics: https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/discussions/122
+
+## 4.0.0.13040 - 4.0.0 Voralpha 10 für Alpha 16 / 4.0.0 pre-alpha 10 for alpha 16
+This release:
+- for those who are still using 4.0.0 alpha 15.7.1, this release fixes all issues that were already fixed in the previous pre-alphas too: https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/blob/main/CHANGELOG.md
+- now patches are confirmed working on 2017 iMac, tested by @jasondillontech-lgtm
+- fixes an issue where Installing drivers and patches may continue without enabling full disk access to OpenCore Legacy Patcher, which may result in Permission denied error:
+<img width="3024" height="4032" alt="621701350-d4a42d00-e654-460c-9f72-22462657c63b" src="https://github.com/user-attachments/assets/b56cb483-aa72-488e-83db-ef475170dab7" />
+This is fixed by asking the user to grant full disk access:
+<img width="632" height="415" alt="Bildschirmfoto 2026-07-17 um 20 52 31" src="https://github.com/user-attachments/assets/c5c0b1dc-11f5-4ed1-8c19-17ab542d7a77" />
+Known issues:
+- despite gaining the patcher full disk access, to ask for full disk access again while they are already gained
+<img width="1440" height="900" alt="Bildschirmfoto 2026-07-17 um 20 54 38" src="https://github.com/user-attachments/assets/c57116a5-6dae-4256-855a-a6352420f2e7" />
+
+
+Diese Version:
+
+- Für alle, die noch Version 4.0.0 Alpha 15.7.1 verwenden: Diese Version behebt alle Probleme, die bereits in den vorherigen Pre-Alpha-Versionen behoben wurden: https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/blob/main/CHANGELOG.md
+
+- Die Patches funktionieren nun nachweislich auf dem 2017er iMac, getestet von @jasondillontech-lgtm
+
+- Behebt ein Problem, bei dem die Installation von Treibern und Patches fortgesetzt werden konnte, ohne dem OpenCore Legacy Patcher vollen Festplattenzugriff zu gewähren. Dies konnte zu einem Zugriffsfehler führen:
+
+<img width="3024" height="4032" alt="621701350-d4a42d00-e654-460c-9f72-22462657c63b" src="https://github.com/user-attachments/assets/b56cb483-aa72-488e-83db-ef475170dab7" /> Das Problem wird behoben, indem der Benutzer um vollständigen Festplattenzugriff gebeten wird:
+
+<img width="632" height="415" alt="Bildschirmfoto 2026-07-17 um 20 52 31" src="https://github.com/user-attachments/assets/c5c0b1dc-11f5-4ed1-8c19-17ab542d7a77" />
+Bekannte Probleme:
+
+- Obwohl dem Patcher bereits vollständiger Festplattenzugriff gewährt wurde, wird erneut um vollständigen Festplattenzugriff gebeten.
+<img width="1440" height="900" alt="Bildschirmfoto 2026-07-17 um 20 54 38" src="https://github.com/user-attachments/assets/c57116a5-6dae-4256-855a-a6352420f2e7" />
+
+## 4.0.0.12041 - 4.0.0 alpha 15.7.1 & 4.0.0.13032 - Voralpha 9.2 für Alpha 16 / pre-alpha 9.2 for alpha 16:
+Restoring Privilege Separation
+
+A lot of users, including @YBronst and others, inlcuding in InsanelyMac here: https://www.insanelymac.com/forum/topic/362543-the-oclp-plus-3x-tahoe-patch-set/page/5/ reported frustration with osascript -a spawning sudo for every command. Thanks for sharing the frustration! I'm definately frustrated from osascript -a too.
+
+Improvements:
+
+Reintroduced Privileged Helper Tool: We have moved away from the osascript implementation used in 3.0.0 builds. The new Helper Tool restores a cleaner, more reliable XPC-based architecture, removing the repeated password prompts that caused significant friction.
+
+Note on make debug: This build currently utilizes a debug-signed helper for development purposes. While this configuration is technically less restrictive than a production-signed binary, we have prioritized usability to stabilize the platform.
+
+Known Issues & Status:
+
+Root Patching & Login Stability: We are investigating reports regarding authentication issues following root patch application. I am currently working on a fix but will not push it to the main branch until the solution is verified stable.
+
+Call for Testing: Version 4.0.0 Pre-Alpha 9.2 is available here for those who wish to assist in debugging: https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/releases/tag/4.0.0.13032
+
+Recommended Workflow: Until login stability is confirmed, I recommend using this release to Build OpenCore only, while avoiding the "Install Drivers and Patches" module.
+
+As I do not have a non-T2 system for dedicated testing, I am relying on the community to help identify the specific regression causing these login issues. Please report your findings on the tracker. Thank you for your patience as we rebuild the foundation of this project.
+
+Why was the Priveleged Helper Tool removed in alpha 15.7 and then restored in alpha 15.7.1? The answer is: it wasn't in use since 3.0.0 alpha 5, it was a forgotten item that was still installing anyways - which was dangerous. In 3.0.0 alpha 5, the helper tool was abandoned in favor of sudo -v, which works only in the Terminal. In 4.0.0 alpha 11, this patcher migrated away from sudo -v, because now people were using GUI instead of running from source.
+
+Wiederherstellung der Privilegientrennung
+
+Viele Benutzer, darunter @YBronst und andere, auch im InsanelyMac-Forum (siehe: https://www.insanelymac.com/forum/topic/362543-the-oclp-plus-3x-tahoe-patch-set/page/5/), berichteten von Frustration darüber, dass osascript -a für jeden Befehl sudo auslöste. Danke fürs Teilen dieser Frustration! Ich bin von osascript -a ebenfalls auch frustriert.
+
+Verbesserungen:
+
+Wiedereinführung des Privileged Helper Tools: Wir haben die in Version 3.0.0 verwendete osascript-Implementierung durch das neue Helper Tool ersetzt. Das neue Helper Tool stellt eine sauberere und zuverlässigere XPC-basierte Architektur wieder her und beseitigt die wiederholten Passwortabfragen, die erhebliche Probleme verursachten.
+
+Hinweis zu make debug: Dieser Build verwendet aktuell ein für Entwicklungszwecke signiertes Debug-Helper-Tool. Obwohl diese Konfiguration technisch weniger restriktiv ist als eine für die Produktion signierte Binärdatei, haben wir der Benutzerfreundlichkeit Priorität eingeräumt, um die Plattform zu stabilisieren.
+
+Bekannte Probleme & Status:
+
+Root-Patching & Login-Stabilität: Wir untersuchen Berichte über Authentifizierungsprobleme nach der Anwendung des Root-Patches. Ich arbeite derzeit an einer Lösung, werde diese aber erst in den Hauptzweig übernehmen, wenn die Stabilität der Lösung bestätigt ist.
+
+Aufruf zum Testen: Version 4.0.0 Pre-Alpha 9.2 steht hier für alle zur Verfügung, die beim Debuggen helfen möchten: https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/releases/tag/4.0.0.13032
+
+Empfohlener Workflow: Bis die Login-Stabilität bestätigt ist, empfehle ich, diese Version nur zum Erstellen von OpenCore zu verwenden und das Modul „Treiber und Patches installieren“ zu vermeiden.
+
+Da ich kein Nicht-T2-System für dedizierte Tests habe, bin ich auf die Hilfe der Community angewiesen, um die spezifische Regression zu identifizieren, die diese Login-Probleme verursacht. Bitte melden Sie Ihre Ergebnisse im Tracker. Vielen Dank für Ihre Geduld, während wir das Fundament dieses Projekts wieder aufbauen.
+
+Warum wurde das privilegierte Hilfstool in Alpha 15.7 entfernt und dann in Alpha 15.7.1 wiederhergestellt? Die Antwort: Es wurde seit 3.0.0 Alpha 5 nicht mehr verwendet und war ein vergessenes Element, das sich trotzdem weiterhin installierte – was gefährlich war. In 3.0.0 Alpha 5 wurde das Hilfstool zugunsten von sudo -v aufgegeben, das nur im Terminal funktioniert. In 4.0.0 Alpha 11 wurde dieser Patcher von sudo -v entfernt, da nun vermehrt die grafische Benutzeroberfläche anstelle der Ausführung aus dem Quellcode verwendet wurde.
+
+## 4.0.0.13031 - 4.0.0 Voralpha 9.1 für Alpha 16 / 4.0.0 pre-alpha 9.1 for alpha 16:
+Thanks @jasondillontech-lgtm for again reporting an issue where Universal-Binaries.dmg fails to mount due to using -passphrase instead of -stdinpass!
+This release:
+- updates NvmExpressDxe.efi and XhciDxe.efi to the latest version for better stability and security
+- fixes a bug where Universal-Binaries.dmg fails to mount due to using -passphrase instead of -stdinpass
+sys.patch.py:
+- fixes a vulnerability that lets attackers execute arbitary code
+dmg_mount.py (in sys_patch -> Utilities):
+- fixes a vulnerability where upon an error, the script treats it as if everything is fine. This makes the process continue instead of halting for a critical error. This allows attackers to execute arbitary code or launch DoS attacks.
+
+                if output.returncode != 0:
+                            logging.info("- Failed to mount Universal-Binaries.dmg") # <- this is a vulnerability - the process thinks everything is fine despite facing a critical error
+                            subprocess_wrapper.log(output)
+                            return False # <- this is a vulnerability that can lead to the process continuing to execute instead of exiting. This could lead to an unexpected behavior, the process to crash and attackers to execute arbitary code rather than quitting gracefully
+- fixes a vulnerability that lets attackers launch brute force attacks against Universal-Binaries.dmg, so that attackers later on inject malware into patches for the patcher
+
+      if output.returncode != 0:
+                      logging.error("- Failed to mount DortaniaInternal resources")
+                      subprocess_wrapper.log(output)
+                      if "Authentication error" not in output.stdout.decode():
+                          self._display_authentication_error()
+                      if i == 2:
+                          self._display_too_many_attempts()
+                          return False
+                      logging.exception("Stack Trace:")
+                      continue <- this allows attackers to perform infinite attempts of guessing the password, despite failing already 2 times. They can later on inject malware into patches afterwards.
+                  break
+- In case of an error, this process raises the error using `raise RuntimeError` instead of `logging.error`, `logging exception`, and then `sys.exit(3)`. This allows the process to continue despite the error. This allows attackers to execute arbitrary code, launch denial-of-service (DoS) attacks, or even crash the process instead of exiting smoothly.
+
+- This is the other vulnerability:
+
+            if self.xnu_major == os_data.os_data.catalina.value: # <- missing try/except. This allows attackers to set a suspicious variable to False, then check if it's True, and if not, execute arbitrary code.
+                    result = subprocess_wrapper.run_as_root(["/sbin/mount", "-uw", "/"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                    if result.returncode != 0:
+                                  logging.error("Failed to mount root volume")
+                                  logging.exception("Stack Trace:")
+                                  subprocess_wrapper.log(result)
+                                  sys.exit(3)
+                                  return "/"
+
+Because try/except blocks are missing, this allows attackers to set a suspicious variable to False, then check if it's True, and if not, execute arbitrary code. Furthermore, if an error occurs, the process crashes instead of exiting smoothly. This also allows attackers to execute arbitrary code.
+snapshot.py:
+This fixes the following security vulnerability:
+        if result.returncode != 0:
+                logging.error("Failed to revert APFS snapshot")
+                subprocess_wrapper.log(result)
+                return False # <- this allows attackers to execute arbitrary code or even launch DoS attacks
+
+## 4.0.0.13030 - 4.0.0 Voralpha 9 für Alpha 16 / 4.0.0 pre-alpha 9 for alpha 15 Pre-release
+Thanks @jasondillontech-lgtm for reporting a bug that upon trying to mount Universal-Binaries.dmg will fail due to using deprecated feature!
+This release:
+- tried to fix a bug where upon trying to mount Universal-Binaries.dmg, it failed due to using deprecated Python/macOS feature - but still exists
+
+disk_images.py:
+- fixes a vulnerability where the password of the dmg file was passed as a command line argument
+
+sys_patch.py:
+- fixes a couple of vulnerabilities that lets attackers execute arbitary code as root
+- fixes a vulnerability that lets attackers brick unsupported Macs while trying to patch in order to brick or corrupt the operating system and then execute arbitary code as root
+- Rather than leaving the system in half patched state, now when patches fail in certain cases will automatically revert the APFS snapshot immediately
+- improves error handling by a lot
+
+Vielen Dank an @jasondillontech-lgtm für die Meldung eines Fehlers, der beim Versuch, Universal-Binaries.dmg einzubinden, aufgrund der Verwendung einer veralteten Funktion fehlschlägt!
+Diese Version:
+- Habe ich probiert einen Fehler, der beim Mounten von Universal-Binaries.dmg aufgrund der Verwendung einer veralteten Python/macOS-Funktion fehlschlug - aber dieses Problem existiert noch immer.
+
+disk_images.py:
+- Behebt eine Sicherheitslücke, durch die das Passwort der DMG-Datei als Kommandozeilenargument übergeben wurde.
+
+sys_patch.py:
+- Behebt mehrere Sicherheitslücken, die es Angreifern ermöglichen, beliebigen Code als Root auszuführen.
+- Behebt eine Sicherheitslücke, die es Angreifern ermöglicht, nicht unterstützte Macs während des Patchvorgangs zu beschädigen oder unbrauchbar zu machen, um anschließend beliebigen Code als Root auszuführen.
+- Anstatt das System in einem nur teilweise gepatchten Zustand zu belassen, wird der APFS-Snapshot nun in bestimmten Fällen, wenn Patches fehlschlagen, automatisch sofort wiederhergestellt.
+- Verbessert die Fehlerbehandlung erheblich.
+
+## 4.0.0.13021 - 4.0.0 Voralpha 8.1 / 4.0.0 pre-alpha 8.1:
+This release fixes a bug where optional patches would be injected blindly without checking for byte length of the patch between Find and Replace for T2 Macs
+
+Diese Version behebt einen Fehler, bei dem optionale Patches bei T2 Macs blind eingefügt wurden, ohne die Byte-Länge des Patches zwischen Find und Replace zu überprüfen.
+
+## 4.0.0.12040 - alpha 15.7 (outside the development branch):
 Thanks @jasondillontech-lgtm and @YBronst for reporting a bug upon trying to install drivers and patches for modern audio!
 This release:
 - removes optional patches that are known to cause kernel panics or instability for T2 Macs
@@ -57,7 +413,112 @@ The Vulnerability: The original reliance on exact string matching for build numb
 The Fix: We implemented Input Normalization (e.g., .upper()) and Range-Based Comparison. This ensures that the patcher is robust against minor variations in system reporting, ensuring that security and feature patches are applied reliably across all releases of a major version (like 26.x).
 
 
-## 4.0.0.12030 - 4.0.0 alpha 15.6
+## 4.0.0.13020 - 4.0.0 Voralpha 8 für Alpha 16 / 4.0.0 pre-alpha 8 for alpha 15:
+Thanks @jasondillontech-lgtm for reporting a bug upon trying to install drivers and patches for modern audio!
+This release:
+- fixes a bug that makes certain T2 Macs hang at the Apple Logo
+- fixes a bug where upon trying to Install drivers and patches, it stops with a critical error
+- Now when an update is staged but the user tries to install drivers and patches anyways, instead of just throwing an error, now it will ask whether the user wants to check Apple Software Update or not. If yes, this will open System Preferences / System Settings > General > Software Update.
+- fixes compatability with modern wireless audio on macOS 26 Tahoe where installing this root patch on anything beyond macOS 26.0 Dev Beta 1 will result in a critical error rather than successful patch
+- fixes the following vulnerabilities:
+sys_patch_helpers.py:
+- Fixes a vulnerability in sys_patch_helpers.py where instead of raising an error using logging.error, it raises an error using logging.info, essentially not raising an error at all:
+                elif len(board_to_patch_hex) < len(reported_board_hex):
+                            logging.info(f"Error: Board ID {self.constants.computer.reported_board_id} is longer than {board_to_patch}") # <- this is a vulnerability
+                            raise Exception("Host's Board ID is longer than the kext's Board ID, cannot patch!!!")
+Impact: this allows attackers to launch DoS attacks or execute arbitary code without the user's knowledge while it shows error raising via logging.info instead of logging.error
+- Fix path traversal vulnerability in snb_board_id_patch() by safely resolving paths and validating they stay within expected bounds
+- Remove unsafe shell glob patterns in disable_window_server_caching() to prevent unintended path expansion
+
+Stability improvements:
+- Add atomic write pattern in generate_patchset_plist() using temp file + rename to prevent partial writes
+- Create backups before overwriting patchset files to prevent silent data loss
+- Add proper error handling for file operations with try-except blocks
+- Validate generate_copy_arguments() return value before using in patch_gpu_compiler_libraries()
+- Fix TOCTTOU (Time-of-Check-Time-of-Use) race condition by using atomic rename
+- Improve exception handling with proper error logging and context
+
+Code quality:
+- Use pathlib.Path throughout for safer path handling
+- Add input validation for source_files_path parameter
+- Correct logging.error() calls (was using logging.info() for errors)
+- Add missing type hints and docstring updates
+- Add missing imports (shutil, glob)"
+
+
+modern_audio.py:
+1. Arbitrary Code Execution (ACE) via Path Injection
+The Vulnerability: The original code accepted arbitrary string inputs for system paths and versioning. In a patching context, this allows an attacker to manipulate those inputs to point the patcher to malicious files or system-critical binaries, resulting in persistent code execution at the root level.
+
+The Fix: We implemented a Static Patch Registry. By defining _PATCH_REGISTRY with hardcoded, immutable destination paths, we removed the ability for any external variable or input to influence where the patcher writes. The script now refuses to act on any path not explicitly whitelisted in the registry.
+
+2. Time-of-Check to Time-of-Use (TOCTOU) & Logic Spoofing
+The Vulnerability: Relying on a fragile, single-build string check (25A5279m) for system security is insecure. An attacker could potentially spoof the OS build report to trigger a "native" state (bypassing necessary patches) or force a downgrade/fallback to an older, insecure AppleHDA version.
+
+The Fix: We transitioned to a Version-Range Evaluation. By checking the xnu_major version, we establish a stable, immutable "Gate" for security logic. The patcher now determines its behavior based on the OS's major version architecture rather than easily spoofed build strings.
+
+3. Fail-Open Silent Failure
+The Vulnerability: Your original native_os logic returned False (non-native) for any build that didn't match your hardcoded string. If an unknown OS version was introduced, the code would "fail-open" and attempt to apply patches to an untested environment, which is highly dangerous.
+
+The Fix: We introduced a Fail-Closed Logic. By using explicit conditional state management (e.g., is_native = False), the patcher will now default to a secure state. If an OS is unrecognized, it aborts the patching operation entirely rather than guessing.
+
+4. Logic Fragility & "False Negatives"
+The Vulnerability: The original reliance on exact string matching for build numbers caused legitimate versions to be skipped (e.g., if the OS reported a build string with different casing or minor variations). This creates a Denial of Service (DoS) where essential audio features fail to function because the patcher incorrectly identified the OS as native.
+
+The Fix: We implemented Input Normalization (e.g., .upper()) and Range-Based Comparison. This ensures that the patcher is robust against minor variations in system reporting, ensuring that security and feature patches are applied reliably across all releases of a major version (like 26.x).
+
+
+## 4.0.0.13011 - 4.0.0 Voralpha 7.1 / 4.0.0 pre-alpha 7.1
+Thanks @jasondillontech-lgtm for reporting a bug where trying to install drivers and patches (Root patches) causes an error called An internal error occured while running the Root Patcher!
+This release fixes an issue where upon trying to install Drivers and patches (Root Patches), it faces an error due to invalid syntax and broken sys_patch.py
+
+Vielen Dank an @jasondillontech-lgtm für die Meldung eines Fehlers, bei dem der Versuch, Treiber und Patches (Root-Patches) zu installieren, zu einem Fehler mit der Bezeichnung „An internal error occured while running the Root Patcher!“ führt.
+Diese Version behebt ein Problem, das beim Versuch, Treiber und Patches (Root-Patches) zu installieren, aufgrund ungültiger Syntax und einer beschädigten Datei sys_patch.py ​​zu einem Fehler führte.
+
+## 4.0.0.130010 - 4.0.0 Voralpha 7 für Alpha 16 / 4.0.0 pre-alpha 7 for alpha 16:
+This release fixes critical vulnerabilities:
+- it installed a Priveleged Helper tool that is no longer in use since 3.0.0 alpha 4.3 that is executing as root. This gives the ability for attackers to execute arbitary code with root privileges, which would allow attackers to modify critical system files.
+- Refactor KEXT handling and update download logic to fix vulnerabilities - With the integration of size checking and HTTPS streaming logic, we have closed the three most critical entry points for attacks (supply chain risks) in your automated kext update process: 1. Protection against "Man-in-the-Middle" (MitM) manipulation. The vulnerability: An attacker on the same network (or a compromised DNS server) could inject a modified file under the original name during the curl download. The fix: Using the requests library with raise_for_status() ensures that the connection is running over a validated HTTPS protocol. The script immediately aborts if the SSL certificate is not trusted or the connection is interrupted. 2. Protection against incomplete or corrupted downloads. The vulnerability: If a download is prematurely terminated (e.g., due to an unstable internet connection), a "half" ZIP archive could end up on the hard drive. The script would originally attempt to unpack this fragment, which could lead to errors or—in the worst case—the execution of incomplete, unpredictable code. The fix: By using API size matching (if os.path.getsize(temp_zip) != asset["size"]), the integrity of the file is checked against the official GitHub metadata immediately after downloading. If the file is even one byte too small or too large, the process is stopped before the unzip command is executed. 3. Elimination of the "Blind Trust" Vector (Auditability) The vulnerability: The script previously operated completely transparently "to the outside." After a week, it was no longer possible to verify whether an update had been successful or if a package had been manipulated. The solution: Audit logging records every successful download, including file size and URL, in the update_audit.log file. Why this provides security: You can now periodically check whether the files on your system match expectations. Should a developer's GitHub repository account be compromised and upload a manipulated version with a changed file size, not only will the size check immediately raise an alarm, but you will also have chronological evidence in the log of what happened and when. Summary of "Closed Loops" Security Aspect Old Vulnerability (Blind Trust) New Solution (Verify & Log) Download Source Unverified HTTP/HTTPS Connection Strict HTTPS Validation File Integrity No Content Check Comparison with API Metadata (Size) Transparency No History (Blind) Audit Log for Every Step System Protection Direct System Integration Automatic Stop on Inconsistency This has enabled us to implement a "Defense-in-Depth" strategy: Even if a GitHub asset were compromised, the attacker would additionally have to match the file size exactly to the byte to bypass your check. This massively increases the hurdle for a successful attack, while maintaining full automation and maintainability (no manual hashes).
+- fixes also the following vulnerability:
+            # Call support functions
+                    for function in [
+                        firmware.BuildFirmware,
+                        wired.BuildWiredNetworking,
+                        wireless.BuildWirelessNetworking,
+                        graphics_audio.BuildGraphicsAudio,
+                        bluetooth.BuildBluetooth,
+                        storage.BuildStorage,
+                        smbios.BuildSMBIOS,
+                        security.BuildSecurity,
+                        misc.BuildMiscellaneous
+                    ]:
+                        function(self.model, self.constants, self.config) # <- here's the vulnerability - try/except loop is completely missing that raises an exception if something goes south
+Impact: if a function is not called properly, misbehaving or just an attacker pointing to an arbitary function, an attacker could launch DoS attacks to crash the application or execute arbitary code.
+
+Diese Version behebt kritische Sicherheitslücken:
+
+- Es installierte ein privilegiertes Hilfsprogramm, das seit Version 3.0.0 Alpha 4.3 nicht mehr verwendet wird und als Root ausgeführt wird. Dadurch können Angreifer beliebigen Code mit Root-Rechten ausführen und somit kritische Systemdateien verändern.
+
+- Die KEXT-Verarbeitung wurde überarbeitet und die Download-Logik aktualisiert, um Sicherheitslücken zu schließen. - Durch die Integration von Größenprüfung und HTTPS-Streaming-Logik haben wir die drei wichtigsten Angriffspunkte (Lieferkettenrisiken) in Ihrem automatisierten KEXT-Update-Prozess geschlossen: 1. Schutz vor Man-in-the-Middle-Angriffen (MitM). Die Sicherheitslücke: Ein Angreifer im selben Netzwerk (oder über einen kompromittierten DNS-Server) konnte während des curl-Downloads eine veränderte Datei unter dem Originalnamen einschleusen. Die Lösung: Die Verwendung der Requests-Bibliothek mit `raise_for_status()` stellt sicher, dass die Verbindung über ein validiertes HTTPS-Protokoll läuft. Das Skript wird sofort abgebrochen, wenn das SSL-Zertifikat nicht vertrauenswürdig ist oder die Verbindung unterbrochen wird. 2. Schutz vor unvollständigen oder beschädigten Downloads. Die Schwachstelle: Wird ein Download vorzeitig abgebrochen (z. B. aufgrund einer instabilen Internetverbindung), kann ein unvollständiges ZIP-Archiv auf der Festplatte landen. Das Skript versucht zunächst, dieses Fragment zu entpacken, was zu Fehlern oder – im schlimmsten Fall – zur Ausführung von unvollständigem, unvorhersehbarem Code führen kann. Die Lösung: Durch die Verwendung des API-Größenabgleichs (if os.path.getsize(temp_zip) != asset["size"]) wird die Integrität der Datei unmittelbar nach dem Download anhand der offiziellen GitHub-Metadaten überprüft. Ist die Datei auch nur ein Byte zu klein oder zu groß, wird der Vorgang vor der Ausführung des Entpackungsbefehls abgebrochen. 3. Beseitigung des „Blind Trust“-Angriffs (Überprüfbarkeit). Die Schwachstelle: Das Skript arbeitete zuvor völlig transparent von außen. Nach einer Woche war es nicht mehr möglich zu überprüfen, ob ein Update erfolgreich war oder ob ein Paket manipuliert wurde. Die Lösung: Die Audit-Protokollierung zeichnet jeden erfolgreichen Download inklusive Dateigröße und URL in der Datei update_audit.log auf. Warum dies Sicherheit bietet: Sie können nun regelmäßig überprüfen, ob die Dateien auf Ihrem System den Erwartungen entsprechen. Sollte das GitHub-Repository-Konto eines Entwicklers kompromittiert werden und eine manipulierte Version mit geänderter Dateigröße hochgeladen werden, löst die Größenprüfung nicht nur sofort einen Alarm aus, sondern Sie haben auch chronologische Beweise im Protokoll, was wann passiert ist. Zusammenfassung des Sicherheitsaspekts „Geschlossene Schleifen“ Alte Schwachstelle (Blind Trust) Neue Lösung (Überprüfung & Protokollierung) Downloadquelle Unverifizierte HTTP/HTTPS-Verbindung Strenge HTTPS-Validierung Dateiintegrität Keine Inhaltsprüfung Vergleich mit API-Metadaten (Größe) Transparenz Keine Historie (Blind) Audit-Protokoll für jeden Schritt Systemschutz Direkte Systemintegration Automatischer Stopp bei Inkonsistenz Dies hat es uns ermöglicht, eine „Verteidigung in der Tiefe“-Strategie zu implementieren: Selbst wenn ein GitHub-Asset kompromittiert würde, müsste der Angreifer zusätzlich die Dateigröße bytegenau anpassen, um Ihre Prüfung zu umgehen. Dies erhöht die Hürde für einen erfolgreichen Angriff erheblich und erhält gleichzeitig die volle Automatisierung und Wartbarkeit (keine manuellen Hashes).
+
+- Behebt außerdem die folgende Sicherheitslücke:
+
+          # Call support functions
+                    for function in [
+                        firmware.BuildFirmware,
+                        wired.BuildWiredNetworking,
+                        wireless.BuildWirelessNetworking,
+                        graphics_audio.BuildGraphicsAudio,
+                        bluetooth.BuildBluetooth,
+                        storage.BuildStorage,
+                        smbios.BuildSMBIOS,
+                        security.BuildSecurity,
+                        misc.BuildMiscellaneous
+                    ]:
+                        function(self.model, self.constants, self.config) # <- Hier liegt die Sicherheitslücke – die try/except-Schleife, die eine Ausnahme auslöst, falls ein Fehler auftritt, fehlt vollständig.
+Auswirkung: Wenn eine Funktion nicht ordnungsgemäß aufgerufen wird, sich fehlerhaft verhält oder ein Angreifer einfach auf eine beliebige Funktion verweist, kann ein Angreifer DoS-Angriffe starten, um die Anwendung zum Absturz zu bringen oder beliebigen Code auszuführen.
+
+## 4.0.0.12030 - 4.0.0 alpha 15.6 (outside the development branch)
 This release improves user experience and transparency inside the installer. For example, prior to this release, it said it will install OpenCore Legacy Patcher instead of OpenCore Legacy Patcher T2.
 And also fixes critical vulnerabilities:
 - it installed a Priveleged Helper tool that is no longer in use since 3.0.0 alpha 4.3 that is executing as root. This gives the ability for attackers to execute arbitary code with root privileges, which would allow attackers to modify critical system files.
@@ -100,15 +561,116 @@ Auch behebt kritische Sicherheitslücken:
                         function(self.model, self.constants, self.config) # <- Hier liegt die Sicherheitslücke – die try/except-Schleife, die eine Ausnahme auslöst, falls ein Fehler auftritt, fehlt vollständig.
 Auswirkung: Wenn eine Funktion nicht ordnungsgemäß aufgerufen wird, sich fehlerhaft verhält oder ein Angreifer einfach auf eine beliebige Funktion verweist, kann ein Angreifer DoS-Angriffe starten, um die Anwendung zum Absturz zu bringen oder beliebigen Code auszuführen.
 
-## 4.0.0.12023 - alpha 15.5.3:
+
+## 4.0.0 Voralpha 6.4 für Alpha 16 / 4.0.0 pre-alpha 6.4 for alpha 16:
+This release fixes formatting issues in AutoPkg-Assets.pkg
+
+Diese Version behebt Probleme mit den Formattierung in AutoPkg-Assets.pkg.
+
+## 4.0.0 Voralpha 6.3 für Alpha 16 / 4.0.0 pre-alpha 6.3 for alpha 16:
+This release improves user experience and transparency inside the installer. For example, prior to this release, it said it will install OpenCore Legacy Patcher instead of OpenCore Legacy Patcher T2. 
+
+Diese Version verbessert die Benutzerfreundlichkeit und Transparenz des Installationsprogramms. Beispielsweise wurde vor dieser Version angezeigt, dass OpenCore Legacy Patcher anstelle von OpenCore Legacy Patcher T2 installiert wird.
+
+## 4.0.0 Voralpha 6.2 für Alpha 16 / 4.0.0 pre-alpha 6.2 for alpha 16:
+This release fixes a vulnerability where an attacker may force skipping critical patches on T2 Macs by simply deleting the sys.exit(3) after the logging.error if the length of the bytes between Find and Replace differs to return False to skip:
+Diese Version behebt eine Sicherheitslücke, durch die ein Angreifer kritische Patches auf T2-Macs überspringen kann, indem er einfach das sys.exit(3) nach logging.error löscht, falls die Länge der Bytes zwischen Suchen und Ersetzen unterschiedlich ist, um False zurückzugeben und so das Überspringen zu erzwingen.
+
+        def _validate_patch(self, patch_dict):
+                try:
+                    find_bytes = patch_dict.get("Find")
+                    replace_bytes = patch_dict.get("Replace")
+                    
+                    # Längenvergleich
+                    if len(find_bytes) != len(replace_bytes):
+                        logging.error(f"LÄNGENFEHLER in '{patch_dict.get('Comment')}': "
+                                      f"Find={len(find_bytes)} Bytes, Replace={len(replace_bytes)} Bytes.")
+                        logging.error(f"LENGTH ISSUE in '{patch_dict.get('Comment')}': "
+                                      f"Find={len(find_bytes)} Bytes, Replace={len(replace_bytes)} Bytes.")
+                        return False
+                        sys.exit(3)
+                    return True
+                except Exception as e:
+                    logging.error("Wir haben einen Problem, die Bytes-Länge zu vergleichen")
+                    logging.error("We have an issue to compare the bytes length.")
+                    sys.exit(3)
+                    return False # this is the vulnerability / das ist die Sicherheitslücke
+
+Impact: the attackers can abuse this vulnerability to cause the computer to kernel panic.
+Auswirkungen: Angreifer können diese Sicherheitslücke ausnutzen, um einen Kernel-Panic des Computers zu verursachen.
+Außerdem, es gibt keinen Sinn, nach sys.exit(3), return False auszuführen - und doch, es ist eine gefährliche Sicherheitslücke.
+Furthermore, there is no point in executing `return False` after `sys.exit(3)` - and it is a dangerous vulnerability.
+
+## 4.0.0.12023 - alpha 15.5.3: (outside the development branch)
 This release fixes a bug where on T2 Macs it skips injecting critical patches that have different Find and Replace byte lenghts by simply stopping the process in case this happens.
 Diese Version behebt einen Fehler, der dazu führt, dass auf T2 Macs das Einfügen kritischer Patches mit unterschiedlichen Find- und Replace-Bytelängen übersprungen wird, indem der Prozess in diesem Fall einfach gestoppt wird.
 
-## 4.0.0.12022 - alpha 15.5.2:
+## 4.0.0 Voralpha 6.1 für Alpha 16 / 4.0.0 pre-alpha 6 for alpha 16:
+This release fixes a bug where it offers to downgrade to the alpha release.
+
+Diese Version behebt einen Fehler, indem es anbietet, auf Alpha-Version downzugraden.
+
+## 4.0.0 Voralpha 6 für alpha 16 / 4.0.0 pre-alpha 6 for alpha 16:
+This release:
+- swtiches away from a/prea builds as the updater treats those as special versions and that's a huge vulnerability that makes people leave with vulnerable versions on their machines. 
+- Fixes the following vulnerabilities:
+By switching from external shell calls to the native functions of the Python standard library (pathlib), we primarily eliminated potential attack vectors that, while rarely exploited in a controlled environment, are nevertheless considered "best practice" security risks.
+
+Here are the specific improvements:
+
+1. Elimination of "Command Injection" Risks
+
+Before: Calling /bin/mv or /bin/rm via subprocess.run, while secure against direct injection with a correct list pass, still involved calling an external binary file. If the script were extended in an insecure context (e.g., with variable path inputs), special characters in filenames could manipulate the shell environment.
+
+After: By using pathlib.Path.unlink() and pathlib.Path.replace(), no process call is made. The file system operation is performed directly within the Python interpreter using operating system APIs. This completely decouples the script from shell interpretation.
+
+2. Protection against file path race conditions
+
+Before: When calling /bin/mv or /bin/rm, the system had to pass the path to the shell, which then had to locate the binary file, execute it, and resolve the path. An attacker with file system access could theoretically attempt to replace the file with a symbolic link between the command being called and its execution (symlink race).
+
+After: Since pathlib processes paths more atomically, or directly at the operating system level, the window of opportunity for such manipulation is significantly reduced. Furthermore, `unlink(missing_ok=True)` prevents errors with non-existent files without the need for shell error messages.
+
+
+``` 3. Improved Error Handling and Stability
+
+Before: While the return value of the subprocess call was checked, failures of the shell itself (e.g., permission errors or blocked paths) were often only logged in a rudimentary way.
+
+After: By integrating `try...except` OSError blocks, file access errors are now caught and handled in Python, instead of leaving the script in an undefined state or allowing uncontrolled error output from the shell.
+
+4. Avoidance of Path Traversal (Indirectly)
+
+Improvement: Since `pathlib` explicitly manages the path as an object, the script is now stricter in path validation. If you add further functions in the future that retrieve filenames from an API (such as apple_db), the pathlib structure provides a better basis for sanitizing paths (e.g., using Path(filename).name), thus preventing malicious path specifications such as ../../etc/passwd from being accepted as filenames.
+
+Diese Version:
+- verzichtet auf a/prea-Builds, da der Updater diese als spezielle Versionen behandelt. Dies stellt eine gravierende Sicherheitslücke dar, die dazu führt, dass Nutzer anfällige Versionen auf ihren Rechnern behalten.
+- behebt die folgende Sicherheitslücken:
+Durch die Umstellung von externen Shell-Aufrufen auf die nativen Funktionen der Python-Standardbibliothek (pathlib) wurden primär potenzielle Angriffsvektoren beseitigt, die zwar in einem kontrollierten Umfeld selten ausgenutzt werden, aber dennoch als "Best Practice"-Sicherheitsrisiken gelten.
+
+Hier sind die spezifischen Verbesserungen:
+
+1. Eliminierung von "Command Injection"-Risiken
+Vorher: Der Aufruf von /bin/mv oder /bin/rm über subprocess.run ist zwar bei korrekter Listen-Übergabe sicher gegen direkte Injection, bleibt aber dennoch ein Aufruf einer externen Binärdatei. Wenn das Skript in einem unsicheren Kontext (z.B. mit variablen Eingaben für Pfade) erweitert würde, könnten Sonderzeichen in Dateinamen die Shell-Umgebung manipulieren.
+
+Nachher: Durch die Verwendung von pathlib.Path.unlink() und pathlib.Path.replace() findet kein Prozessaufruf mehr statt. Die Dateisystem-Operation erfolgt innerhalb des Python-Interpreters direkt über Betriebssystem-APIs. Dies entkoppelt das Skript vollständig von der Shell-Interpretation.
+
+2. Schutz vor "Race Conditions" bei Dateipfaden
+Vorher: Beim Aufruf von /bin/mv oder /bin/rm muss das System den Pfad an die Shell übergeben, diese muss die Binärdatei finden, ausführen und den Pfad auflösen. Ein Angreifer mit Zugriff auf das Dateisystem könnte theoretisch versuchen, die Datei zwischen dem Aufruf und der Ausführung des Befehls durch einen symbolischen Link zu ersetzen (Symlink-Race).
+
+Nachher: Da pathlib die Pfade atomarer bzw. direkt auf Betriebssystem-Ebene verarbeitet, ist das Zeitfenster für solche Manipulationen deutlich verringert. Zudem verhindert unlink(missing_ok=True) Fehler bei nicht existierenden Dateien ohne den Umweg über Shell-Fehlermeldungen.
+
+3. Verbesserte Fehlerbehandlung und Stabilität
+Vorher: Der Rückgabewert des subprocess-Aufrufs wurde zwar geprüft, aber ein Fehlschlag der Shell selbst (z.B. Berechtigungsfehler oder blockierte Pfade) wurde oft nur rudimentär protokolliert.
+
+Nachher: Durch die Integration in try...except OSError-Blöcke werden Fehler bei Dateizugriffen nun abgefangen und in Python behandelt, anstatt das Skript in einen undefinierten Zustand zu versetzen oder unkontrollierte Fehlerausgaben der Shell zuzulassen.
+
+4. Vermeidung von "Path Traversal" (Indirekt)
+Verbesserung: Da pathlib den Pfad explizit als Objekt verwaltet, ist das Skript nun strikter bei der Pfadvalidierung. Wenn Sie zukünftig weitere Funktionen hinzufügen, die Dateinamen von einer API beziehen (wie apple_db), bietet die pathlib-Struktur eine bessere Basis, um Pfade zu "sanitizen" (z.B. durch Path(dateiname).name), wodurch verhindert wird, dass bösartige Pfad-Spezifikationen wie ../../etc/passwd als Dateiname akzeptiert werden.
+
+## 4.0.0.12022 - alpha 15.5.2: (outside the development branch)
 updates BlueToolFixup, NVMeFix, CPUFriend and AirportBrcmFixup to their latest versions to ensure stability, security and macOS 26 Tahoe compatability. This includes fixes that affect non-T2 Macs primarily, but also, T2 Macs.
 BlueToolFixup, NVMeFix, CPUFriend und AirportBrcmFixup werden auf die neuesten Versionen aktualisiert, um Stabilität, Sicherheit und Kompatibilität mit macOS 26 Tahoe zu gewährleisten. Dies umfasst Fehlerbehebungen, die sich hauptsächlich auf Nicht-T2-Macs, aber auch auf T2-Macs auswirken.
 
-## 4.0.0.12021 - alpha 15.5.1
+## 4.0.0.12021 - alpha 15.5.1 (outside the development branch)
 This release fixes update reliability issues.
 Diese Version behebt Probleme mit der Zuverlässigkeit von Updates.
 If you are using alpha 15.5.0 or earlier, you should download it manually.
@@ -116,7 +678,7 @@ Falls Sie Alpha 15.5.0 oder älter verwenden, Sie sollen manuell herunterladen.
 Those who are using pre-alphas, they only get alpha updates, or in very certain cases, RCs or late pre-alpha versions.
 Wer Vorab-Alphas nutzt, erhält nur Alpha-Updates oder in sehr bestimmten Fällen RCs oder späte Vorab-Alpha-Versionen.
 
-## 4.0.0.12020 - alpha 15.5:
+## 4.0.0.12020 - alpha 15.5: (outside the development branch)
 This version:
 
 swtiches away from a/prea builds as the updater treats those as special versions and that's a huge vulnerability that makes people leave with vulnerable versions on their machines.
@@ -126,7 +688,7 @@ Diese Version:
 verzichtet auf a/prea-Builds, da der Updater diese als spezielle Versionen behandelt. Dies stellt eine gravierende Sicherheitslücke dar, die dazu führt, dass Nutzer anfällige Versionen auf ihren Rechnern behalten.
 Es können Fehler beim Injizieren von Kexts auftreten, ich kann das Update jedoch nicht verzögern, da es kritisch ist.
 
-## 4.0.0 alpha 15.4.3:
+## 4.0.0 alpha 15.4.3: (outside the development branch)
 Diese Version behebt einen Fehler, bei dem die Funktion, die die Byte-Länge prüfen sollte, dies nicht tat. Der fehlerhafte Code lautete wie folgt:
 
 def _validate_patch(self, patch_dict): #fehlerhafte Logik folgt
@@ -159,7 +721,20 @@ def _validate_patch(self, patch_dict): #buggy logic continues from here
             logging.info("Bitte aktualisieren Sie den App falls eine neuere Version vorhanden ist.")
             logging.info("Please update the app if a newer version is available")
 
-## 4.0.0 alpha 15.4.2:
+
+## 4.0.0 Voralpha 5 für alpha 16 / 4.0.0 pre-alpha 5 for alpha 16:
+This release:
+
+fixes an error where it thinks that certain kexts are running on older versions
+Diese Version:
+
+Behebt einen Fehler, der dazu führte, dass bestimmte Kernel-Erweiterungen (kexts) fälschlicherweise als ältere Versionen erkannt wurden.
+
+## 4.0.0 Voralpha 4 für alpha 16 / 4.0.0 pre-alpha 4 for alpha 16:
+This release fixes a kernel panic on T2 Macs where certain NVRAM variables aren't set up properly. A bug that was available in the previous pre-alpha. This happened while I was trying to fix a vulnerability.
+Diese Version behebt einen Kernel-Panic auf T2-Macs, bei dem bestimmte NVRAM-Variablen nicht korrekt konfiguriert waren. Dieser Fehler war bereits in der vorherigen Pre-Alpha-Version vorhanden. Das passierte, während ich versuchte, eine Sicherheitslücke zu beheben.
+
+## 4.0.0 alpha 15.4.2 (outside the development branch):
 This version fixes the following bug:
 since the official OpenCore Legacy Patcher uses Nightly/non-Nighly, and our uses alpha, canary, beta and stable, this causes a conflict when checking for updates for updates:
 self.installer_pkg_url: str = f"{self.repo_link}/releases/download/{self.patcher_version}/AutoPkg-Assets.pkg"
@@ -198,6 +773,61 @@ self.patcher_full_name: str = f"{self.patcher_name} version {self.patcher_versio
     self.repo_link:                       str = "https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/"
     self.installer_pkg_url:               str = f"{self.repo_link}/releases/download/{self.patcher_version}/AutoPkg-Assets.pkg"
     self.installer_pkg_url_nightly:       str = f"{self.repo_link}/releases/download/{self.patcher_version}/AutoPkg-Assets.pkg" # here is the bug - this should be removed / das soll entfernt sein
+
+## 4.0.0 pre-alpha 3 for alpha 16 / 4.0.0 Voralpha 3 für Alpha 16:
+This version:
+
+fixes bugs
+improves performance of the application by 25%
+updates BlueToolFixup, NVMeFix, CPUFriend and AirportBrcmFixup to their latest versions to ensure stability, security and macOS 26 Tahoe compatability. This includes fixes that affect non-T2 Macs primarily, but also, T2 Macs
+You can switch between Windows and macOS via the Boot Camp Control Panel if both are booted via OpenCore on all UEFI based Intel Macs now
+But this hasn't been fixed yet:
+
+Bugs in WhateverGreen (even the latest version by Dortania) causes gray screen on T2 Macs: #104
+
+Diese Version:
+
+behebt Fehler
+
+verbessert die Anwendungsleistung um 25 %
+
+aktualisiert BlueToolFixup, NVMeFix, CPUFriend und AirportBrcmFixup auf die neuesten Versionen, um Stabilität, Sicherheit und Kompatibilität mit macOS 26 Tahoe zu gewährleisten. Dies umfasst Korrekturen, die hauptsächlich Nicht-T2-Macs, aber auch T2-Macs betreffen.
+
+Auf allen UEFI-basierten Intel-Macs kann man jetzt über das Boot Camp-Kontrollfeld zwischen Windows und macOS wechseln, sofern beide über OpenCore gestartet wurden.
+
+Folgendes Problem besteht jedoch noch:
+
+Ein Fehler in WhateverGreen (selbst in der neuesten Version von Dortania) verursacht einen grauen Bildschirm auf T2-Macs: #104
+
+## 4.0.0 pre-alpha 2 for alpha 16 / 4.0.0 Voralpha 2 für Alpha 16:
+This release:
+- fixes a bug where it may have not been looking for byte length difference between Find and Replace
+- fixes a bug where on the Tahoe Cache Fix patch, the byte length between Find and Replace is different
+- removes Bypass AppleBCMWLANCore timeout patch as it causes hangs at Apple logo
+
+But this hasn't been fixed yet:
+- Bugs in WhateverGreen (even the latest version by Dortania) causes gray screen on T2 Macs: https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/104
+
+Diese Version:
+- Behebt einen Fehler, bei dem möglicherweise nicht nach Byte-Längenunterschieden zwischen Suchen und Ersetzen gesucht wurde.
+
+- Behebt einen Fehler, bei dem die Byte-Länge zwischen Suchen und Ersetzen im Tahoe Cache Fix-Patch unterschiedlich war.
+
+- Entfernt den Bypass AppleBCMWLANCore-Timeout-Patch, da dieser zu Hängern beim Apple-Logo führte.
+
+Folgendes ist jedoch noch nicht behoben:
+- Fehler in WhateverGreen (auch in der neuesten Version von Dortania) verursachen einen grauen Bildschirm auf T2-Macs: https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/104
+
+## 4.0.0 pre-alpha 1 for alpha 16 / 4.0.0 Voralpha 1 für Alpha 16
+This release:
+- now tells users if they have enabled optional patches or not
+- fixes byte lenghts for SEP OOL constraints patch, in the next pre-alpha and alpha releases will be rolled out to all patches
+
+Diese Version:
+
+- zeigt Benutzern nun an, ob optionale Patches aktiviert sind oder nicht.
+
+- korrigiert die Byte-Längen für den SEP OOL Constraints-Patch. Die Korrektur wird in den nächsten Pre-Alpha- und Alpha-Versionen für alle Patches ausgerollt.
 
 ## 4.0.0 alpha 15.4.1:
 This release adds a check for T2 patches if the Find and Replace length is the same and if not, it will abort patching. However, for fork developers, they need to read the sichere Injizierung von Patches für T2 Macs.txt (in German, you may need to translate using Google Translate or AI if you don't understand) to implement these checks properly.

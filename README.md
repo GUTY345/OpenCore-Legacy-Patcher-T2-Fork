@@ -25,14 +25,14 @@ A Python-based project revolving around [Acidanthera's OpenCorePkg](https://gith
 - [X] Update RestrictEvents to 1.1.6 - done
 - [X] Update CryptexFixup to 1.0. - done
 - [X] Update FeatureUnlock to 1.1.8 - done
-- [X] Set DisableIoMapper to True for T2 Macs - done
 - [X] Remove USB port mapping for MacBookAir8,1 and 8,2 - done
 - [X] Fix https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/25 
 - [X] Return support for MacBookAir8,1 and MacBookAir8,2
 - [X] Installer boots
 - [ ] MacBookAir8,1 and MacBookAir8,2 can boot the installer
 - [ ] Internal hard drive mounts properly on T2 Macs - https://github.com/albert-mueller/OpenCore-Legacy-Patcher-T2/issues/69
-- [ ] Post-install + ability to reach the desktop
+- [ ] ability to reach the desktop
+- [ ] Post install - issues with second stage
 - [ ] GPU accelaration/WiFi - most T2 Macs will have WIFi and possibly GPU accelaration out of the box
 
 
@@ -40,7 +40,7 @@ Our goal of this project is to add support for T2 Macs so unsupported T2 Macs ca
 
 Noteworthy features of OpenCore Legacy Patcher:
 
-* Support for macOS Big Sur, Monterey, Ventura, Sonoma, Sequoia and eventually add support for Tahoe.
+* Support for macOS Monterey, Ventura, Sonoma, Sequoia and eventually add support for Tahoe.
 * Native Over the Air (OTA) System Updates
 * Supports Penryn and newer Macs
 * Full support for WPA Wi-Fi and Personal Hotspot on BCM943224 and newer wireless chipsets
@@ -57,7 +57,7 @@ Note: Only clean-installs and upgrades are supported. macOS Big Sur installs alr
 
 * You can, however, reinstall macOS with this patcher and retain your original data
 
-Note 2: Currently, OpenCore Legacy Patcher officially supports patching to run macOS Big Sur through Sonoma installs. For older OSes, OpenCore may function; however, support is currently not provided from Dortania.
+Note 2: Currently, OpenCore Legacy Patcher officially supports patching to run macOS Monterey through Tahoe installs. For older OSes, OpenCore may function; however, support is currently not provided from Albert Müller.
 
 * For macOS Mojave and Catalina support, we recommend the use of [dosdude1's patchers](http://dosdude1.com)
 
@@ -90,17 +90,22 @@ To run the project from source, see here: [Build and run from source](./SOURCE.m
   * Great amounts of help with debugging, and code suggestions
 * [Ausdauersportler](https://github.com/Ausdauersportler)
   * iMacs Metal GPUs Upgrade Patch set and documentation
+* [nxvid](https://github.com/nxvid/OpenCore-Legacy-Patcher-T2/)
+  * for documenting and fixing an issue where sbvmm might not have been injected on T2 Macs
+* [TheRaddish1313](https://github.com/TheRaddish1313)
+    * for fixing framebuffer issues and boot args
 * [vit9696](https://github.com/vit9696)
 * [Albert Müller](https://github.com/albert-mueller/)
   * Adding support for unsupported T2 Macs and the main author of this fork
   * Help troubleshooting, determining fixes and writing patches
 * [YBronst](https://github.com/YBronst/OCLP-Plus)
-  * for fixing modern wireless on macOS 26 Tahoe
+* for fixing modern wireless on macOS 26 Tahoe
 * [vytska69](https://github.com/vytska69)
   * [developing patches for the T2 chip](https://github.com/vytska69/OpenCore-Legacy-Patcher)
   * [Developing Secure Enclave Processor (SEP) timeout patches](https://github.com/vytska69/OpenCore-Legacy-Patcher)
   * [workflow files](https://github.com/vytska69/OpenCore-Legacy-Patcher)
-  *[peltorio](https://github.com/peltorio/)
+  
+  * [peltorio](https://github.com/peltorio/)
     * Fix a critical bug in GitHub Actions by changing macos-version to macos-15
 * [kodeaqua](https://github.com/kodeaqua)
   * for research on MacBook Air 2018-2019 hardware to fix boot issues
