@@ -5,6 +5,7 @@ mount.py: Handling macOS root volume mounting and unmounting
 import logging
 import plistlib
 import subprocess
+import sys
 
 from pathlib import Path
 
@@ -32,7 +33,9 @@ class RootVolumeMount:
         try:
             content = plistlib.loads(subprocess.run(["/usr/sbin/diskutil", "info", "-plist", "/"], capture_output=True).stdout)
         except plistlib.InvalidFileException:
-            raise RuntimeError("Failed to parse diskutil output.")
+            logging.error("Failed to parse diskutil output")
+            logging.exception("Stack Trace")
+            sys.exit(3)
 
         disk = content["DeviceIdentifier"]
 
@@ -56,23 +59,35 @@ class RootVolumeMount:
 
         # Catalina implemented a read-only root volume
         if self.xnu_major == os_data.os_data.catalina.value:
-            result = subprocess_wrapper.run_as_root(["/sbin/mount", "-uw", "/"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            if result.returncode != 0:
-                logging.error("Failed to mount root volume")
-                subprocess_wrapper.log(result)
-                return None
-            return "/"
+            try:
+                result = subprocess_wrapper.run_as_root(["/sbin/mount", "-uw", "/"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                if result.returncode != 0:
+                    logging.error("Failed to mount root volume")
+                    logging.exception("Stack Trace:")
+                    subprocess_wrapper.log(result)
+                    sys.exit(3)
+                return "/"
+            except Exception as e:
+                logging.error("We face a critical, unexpected error mounting the root volume")
+                logging.exception("Stack Trace:")
+                sys.exit(3)
 
         # Big Sur and newer implemented APFS snapshots for the root volume
         if self.xnu_major >= os_data.os_data.big_sur.value:
-            if Path("/System/Volumes/Update/mnt1/System/Library/CoreServices/SystemVersion.plist").exists():
+            try:
+                if Path("/System/Volumes/Update/mnt1/System/Library/CoreServices/SystemVersion.plist").exists():
+                    return "/System/Volumes/Update/mnt1"
+                result = subprocess_wrapper.run_as_root(["/sbin/mount", "-o", "nobrowse", "-t", "apfs", f"/dev/{self.root_volume_identifier}", "/System/Volumes/Update/mnt1"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                if result.returncode != 0:
+                    logging.error("Failed to mount root volume")
+                    logging.exception("Stack Trace:")
+                    subprocess_wrapper.log(result)
+                    sys.exit(3)
                 return "/System/Volumes/Update/mnt1"
-            result = subprocess_wrapper.run_as_root(["/sbin/mount", "-o", "nobrowse", "-t", "apfs", f"/dev/{self.root_volume_identifier}", "/System/Volumes/Update/mnt1"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            if result.returncode != 0:
-                logging.error("Failed to mount root volume")
-                subprocess_wrapper.log(result)
-                return None
-            return "/System/Volumes/Update/mnt1"
+            except Exception as e:
+                logging.error("We face an unexpected, critical error while trying to mount the root volume.")
+                logging.exception("Stack Trace:")
+                sys.exit(3)
 
         return None
 
@@ -96,7 +111,9 @@ class RootVolumeMount:
         if result.returncode != 0:
             if ignore_errors is False:
                 logging.error("Failed to unmount root volume")
+                logging.exception("Stack Trace:")
                 subprocess_wrapper.log(result)
+                sys.exit(3)
             return False
 
         return True
@@ -113,10 +130,12 @@ class RootVolumeMount:
         result = self._mount_root_volume()
         if result is None:
             logging.error("Failed to mount root volume")
-            return None
+            logging.exception("Stack Trace:")
+            sys.exit(3)
         if not Path(result).exists():
             logging.error(f"Attempted to mount root volume, but failed: {result}")
-            return None
+            logging.exception("Stack Trace:")
+            sys.exit(3)
 
         self.mount_path = result
 

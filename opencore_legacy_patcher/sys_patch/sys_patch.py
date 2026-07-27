@@ -212,7 +212,6 @@ class PatchSysVolume:
                     f"expected {self.constants.detected_os_version} ({self.constants.detected_os_build})"
                 )
                 logging.error("An update is in progress on your machine and patching cannot continue until it is cancelled or finished")
-                logging.exception("Stack Trace:")
                 return False
         except FileNotFoundError:
             logging.error("- SystemVersion.plist file not found")
@@ -241,12 +240,17 @@ class PatchSysVolume:
             save_hid_cs (bool): If True, will save the HID CS file before merging KDK.
                                 Required for USB 1.1 downgrades on Ventura and newer.
         """
-        logging.debug(f"Merging KDK with root volume (save_hid_cs={save_hid_cs})")
-        self.kdk_path = KernelDebugKitMerge(
-            self.constants,
-            self.mount_location,
-            self.skip_root_kmutil_requirement
-        ).merge(save_hid_cs)
+        try:
+            logging.debug(f"Merging KDK with root volume (save_hid_cs={save_hid_cs})")
+            self.kdk_path = KernelDebugKitMerge(
+                self.constants,
+                self.mount_location,
+                self.skip_root_kmutil_requirement
+            ).merge(save_hid_cs)
+        except Exception as e:
+            logging.error("Merging KDK with root volume failed")
+            logging.exception("Stack Trace:")
+            return
 
 
     def _unpatch_root_vol(self):
@@ -300,14 +304,21 @@ class PatchSysVolume:
 
         if not self._create_new_apfs_snapshot():
             return False
-
-        self._unmount_root_vol()
+        try:
+            logging.info("Unmounting the root volume")
+            self._unmount_root_vol()
+        except Exception as e:
+            logging.error("Failed to unmount the root volume")
+            logging.exception("Stack Trace:")
 
         logging.info("- Patching complete")
         logging.info("\nPlease reboot the machine for patches to take effect")
 
         if self.needs_kmutil_exemptions:
-            logging.info("Note: Apple will require you to open System Preferences -> Security to allow the new kernel extensions to be loaded")
+            if self.constants.detected_os <= os_data.os_data.monterey:
+                logging.info("Note: Apple will require you to open System Preferences -> Security to allow the new kernel extensions to be loaded")
+            else:
+                logging.info("Note: Apple will require you to open System Settings -> Privacy & Security to allow the new kernel extensions to be loaded")
 
         self.constants.root_patcher_succeeded = True
         return True
@@ -354,6 +365,7 @@ class PatchSysVolume:
         """
         logging.debug("Creating new APFS snapshot")
         try:
+            logging.info("Creating APFS snapshot")
             return APFSSnapshot(self.constants.detected_os, self.mount_location).create_snapshot()
         except Exception as e:
             logging.error(f"- Failed to create APFS snapshot: {e}")
@@ -368,6 +380,7 @@ class PatchSysVolume:
         Only required on Mojave and older.
         """
         if self.constants.detected_os > os_data.os_data.catalina:
+            logging.info(f"You're running macOS 10.15 Catalina or newer, which is newer than macOS 10.14 Mojave, so not compatible with dyld shared cache patches.")
             return
         
         logging.info("- Rebuilding dyld shared cache")
@@ -389,6 +402,7 @@ class PatchSysVolume:
         Only required on Catalina.
         """
         if self.constants.detected_os != os_data.os_data.catalina:
+            logging.info("You're not running macOS 10.15 Catalina. The patch for updating the preboot kernel cache is not compatible for your system.")
             return
         
         logging.info("- Rebuilding preboot kernel cache")
@@ -500,17 +514,21 @@ class PatchSysVolume:
         Executes patches and triggers kernel cache rebuild.
         """
         logging.info(f"- Running patches for {self.model}")
-        
-        patches = self.patch_set_dictionary if self.patch_set_dictionary else HardwarePatchsetDetection(self.constants).patches
-        self._execute_patchset(patches)
-
-        if self.constants.wxpython_variant and self.constants.detected_os >= os_data.os_data.big_sur:
-            needs_daemon = self.requires_kdk_caching or self.requires_metallib_caching
-            InstallAutomaticPatchingServices(self.constants).install_auto_patcher_launch_agent(
-                kdk_caching_needed=needs_daemon
-            )
-
-        self._rebuild_root_volume()
+        try:
+            patches = self.patch_set_dictionary if self.patch_set_dictionary else HardwarePatchsetDetection(self.constants).patches
+            self._execute_patchset(patches)
+    
+            if self.constants.wxpython_variant and self.constants.detected_os >= os_data.os_data.big_sur:
+                needs_daemon = self.requires_kdk_caching or self.requires_metallib_caching
+                InstallAutomaticPatchingServices(self.constants).install_auto_patcher_launch_agent(
+                    kdk_caching_needed=needs_daemon
+                )
+    
+            self._rebuild_root_volume()
+        except Exception as e:
+            logging.error("We have a problem to execute patches and rebuild the Kernel Cache.")
+            logging.exception("Stack Trace:")
+            return
 
 
     def _get_destination_path(self, method_type: PatchType, patch_directory: str) -> str:
@@ -524,10 +542,14 @@ class PatchSysVolume:
         Returns:
             str: Full destination path
         """
-        if method_type in [PatchType.OVERWRITE_SYSTEM_VOLUME, PatchType.MERGE_SYSTEM_VOLUME]:
-            return str(self.mount_location) + patch_directory
-        else:
-            return str(self.mount_location_data) + patch_directory
+        try:
+            if method_type in [PatchType.OVERWRITE_SYSTEM_VOLUME, PatchType.MERGE_SYSTEM_VOLUME]:
+                return str(self.mount_location) + patch_directory
+            else:
+                return str(self.mount_location_data) + patch_directory
+        except Exception as e:
+            logging.error("We couldn't get the destination path.")
+            logging.exception("Stack Trace:")
 
 
     def _handle_patch_removal(self, required_patches: dict, patch: str, kc_support_obj) -> None:
@@ -540,8 +562,13 @@ class PatchSysVolume:
             kc_support_obj: Kernel cache support object
         """
         for method_remove in [PatchType.REMOVE_SYSTEM_VOLUME, PatchType.REMOVE_DATA_VOLUME]:
-            if method_remove not in required_patches[patch]:
-                continue
+            try:
+                if method_remove not in required_patches[patch]:
+                    continue
+            except Exception as e:
+                 logging.error("We have issues to handle patch removal, so we couldn't remove the patch.")
+                 logging.exception("Stack Trace:")
+                 return
                 
             for remove_patch_directory in required_patches[patch][method_remove]:
                 logging.info("- Remove Files at: " + remove_patch_directory)
@@ -676,12 +703,14 @@ class PatchSysVolume:
                 sys_patch_helpers.SysPatchHelpers(self.constants).disable_window_server_caching()
             except Exception as e:
                 logging.error(f"- Failed to disable window server caching: {e}")
+                logging.exception("Stack Trace:")
         
         if "Metal 3802 Common Extended" in required_patches:
             try:
                 sys_patch_helpers.SysPatchHelpers(self.constants).patch_gpu_compiler_libraries(mount_point=self.mount_location)
             except Exception as e:
                 logging.error(f"- Failed to patch GPU compiler libraries: {e}")
+                logging.exception("Stack Trace:")
 
         self._write_patchset(required_patches)
 
@@ -751,9 +780,10 @@ class PatchSysVolume:
         
         if variant == DynamicPatchset.MetallibSupportPkg:
             return self._resolve_metallib_support_pkg()
-        logging.error(f"Unknown Dynamic Patchset: {variant}")
-        logging.exception("Stack Trace:")
-        raise Exception(f"Unknown Dynamic Patchset: {variant}")
+        else:
+            logging.error(f"Unknown Dynamic Patchset: {variant}")
+            logging.exception("Stack Trace:")
+            raise Exception(f"Unknown Dynamic Patchset: {variant}")
 
 
     def _preflight_checks(self, required_patches: dict, source_files_path: Path) -> dict:
@@ -834,6 +864,7 @@ class PatchSysVolume:
             ).clean_auxiliary_kc()
         except Exception as e:
             logging.error(f"- Failed to clean auxiliary kernel cache during preflight: {e}")
+            logging.exception("Stack Trace:")
             raise
 
         # Make sure SNB kexts are compatible with the host
@@ -916,8 +947,17 @@ class PatchSysVolume:
             else:
                 logging.info("User declined update. Exiting the Install drivers and patches menu.")
                 sys.exit(1)
-
-        self._patch_root_vol()
+        try:
+            logging.info("Patchen des Root-Volumes")
+            logging.info("Patching the root volume")
+            self._patch_root_vol()
+        except Exception as e:
+            logging.error("Es hat gescheitert, des Root-Volumes zu patchen")
+            logging.error("Failed to root patch the volume")
+            logging.exception("Stack Trace:")
+            logging.info("Damit wir sicherstellen, dass Ihr System trotz fehlgeschlagener Root-Volumes-Patch noch überhaupt startet, wir werden alle Patches widerrufen.")
+            logging.info("To ensure that your system continues to boot even after the root volume patches have failed to apply, we'll undo the patches that were applied until now.")
+            self.unpatch_root_vol()
 
 
     def start_unpatch(self) -> None:

@@ -64,6 +64,7 @@ class APFSSnapshot:
         if result.returncode != 0:
             logging.error("Failed to revert APFS snapshot")
             subprocess_wrapper.log(result)
-            return False
+            logging.info("Since we cannot revert the APFS snapshot, I highly recommend to either reinstall macOS or perform (repair) upgrade of the existing installation")
+            sys.exit(3)
 
         return True
