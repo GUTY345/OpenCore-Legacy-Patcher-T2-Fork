@@ -389,21 +389,27 @@ class macOSInstallerDownloadFrame(wx.Frame):
     def on_existing(self, event: wx.Event = None) -> None:
         frames = [self, self.frame_modal, self.parent]
         screen_pos = self.GetScreenPosition() if self else None
-        
-        for frame in frames:
-            if frame:
-                try:
-                    frame.Close()
-                except Exception:
-                    pass
-                    
+
+        # Create (and show - macOSInstallerFlashFrame.__init__ already calls
+        # Show()) the next frame BEFORE tearing down these ones. wx.App's
+        # default SetExitOnFrameDelete(True) quits the whole app the instant
+        # the top-level window count hits zero, so closing every existing
+        # frame first - as this used to do - could hit that and shut the
+        # app down before the Flash Frame ever got a chance to be shown.
         gui_macos_installer_flash.macOSInstallerFlashFrame(
             None,
             title=self.title,
             global_constants=self.constants,
             **({"screen_location": screen_pos} if screen_pos else {})
         )
-        
+
+        for frame in frames:
+            if frame:
+                try:
+                    frame.Close()
+                except Exception:
+                    pass
+
         for frame in frames:
             if frame:
                 try:

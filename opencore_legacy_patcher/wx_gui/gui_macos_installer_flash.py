@@ -420,9 +420,6 @@ class macOSInstallerFlashFrame(wx.Frame):
             - If nightly also fails, fall back to the manually uploaded variant
         """
         link = self.constants.installer_pkg_url
-        if network_handler.NetworkUtilities(link).validate_link() is False:
-            logging.info("Stock Install.pkg is missing on Github, falling back to Nightly")
-            link = self.constants.installer_pkg_url_nightly
 
         if link.endswith(".zip"):
             path = self.constants.installer_pkg_zip_path

@@ -17,6 +17,7 @@ from ..wx_gui import (
     gui_build,
     gui_install_oc,
     gui_sys_patch_start,
+    gui_support,
     gui_update,
 )
 
@@ -33,6 +34,47 @@ class SupportedEntryPoints:
     OS_CACHE   = gui_cache_os_update.OSUpdateFrame
 
 
+class PatcherApp(wx.App):
+    """
+    wx.App subclass so we have a reliable, single place to clean up on
+    quit -- OnExit() fires on every quit path (Cmd+Q, Dock > Quit, or the
+    last window closing), regardless of which frame is currently active.
+    A frame-level EVT_CLOSE handler only ever covers the one frame it was
+    bound to, which isn't enough since this app constantly destroys one
+    top-level frame and creates another as the user navigates.
+    """
+
+    def __init__(self, global_constants: constants.Constants, *args, **kwargs) -> None:
+        self.constants: constants.Constants = global_constants
+        super().__init__(*args, **kwargs)
+
+
+    def OnExit(self) -> int:
+        # Signal first: any background thread checking is_app_exiting()
+        # (e.g. gui_main_menu's update check) should bail out rather than
+        # touch a frame that's being torn down.
+        gui_support.mark_app_exiting()
+
+        # Startup kicks off a couple of background threads (payload
+        # unpacking, analytics) before any window even exists, so they
+        # never check is_app_exiting(). Quitting right after launch, while
+        # one of these is still doing disk/network work, tears the process
+        # down underneath it -- the same autorelease pool corruption
+        # trigger, just from a startup thread instead of a UI one. Give
+        # each a bounded window to finish rather than hanging quit forever.
+        for thread_attr in ("unpack_thread", "analytics_thread"):
+            thread = getattr(self.constants, thread_attr, None)
+            if thread and thread.is_alive():
+                thread.join(timeout=10)
+
+        # Stop any still-running gauge pulse thread before Cocoa tears
+        # down the window it's animating -- letting it keep firing
+        # wx.CallAfter() into a vanishing frame is what corrupts the
+        # autorelease pool on quit.
+        gui_support.stop_all_pulses()
+        return super().OnExit()
+
+
 class EntryPoint:
 
     def __init__(self, global_constants: constants.Constants) -> None:
@@ -45,7 +87,7 @@ class EntryPoint:
 
 
     def _generate_base_data(self) -> None:
-        self.app = wx.App()
+        self.app = PatcherApp(self.constants)
         self.app.SetAppName(self.constants.patcher_name)
 
         # Reference:
@@ -75,7 +117,7 @@ class EntryPoint:
 
         self.frame = entry(
             None,
-            title=f"{self.constants.patcher_name} {self.constants.patcher_version}{' (Nightly)' if not self.constants.commit_info[0].startswith('refs/tags') else ''}",
+            title=f"{self.constants.patcher_name} {self.constants.patcher_version}",
             global_constants=self.constants,
             screen_location=None,
             **({"patches": patches} if is_patching_mode else {})

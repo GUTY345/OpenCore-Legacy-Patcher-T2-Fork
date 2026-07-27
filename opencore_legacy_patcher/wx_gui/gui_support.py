@@ -9,6 +9,8 @@ import logging
 import plistlib
 import threading
 import subprocess
+import os
+import webbrowser
 import applescript
 import packaging.version
 
@@ -40,7 +42,9 @@ get_font_face.font_face = None
 # Centralize the common options for font creation
 def font_factory(size: int, weight):
     return wx.Font(size, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, weight, False, get_font_face())
-
+    
+    # If returncode is 0, we have access.
+    return result.returncode == 0
 
 class AutoUpdateStages:
     INACTIVE = 0
@@ -62,15 +66,57 @@ class GenerateMenubar:
         menubar = wx.MenuBar()
         fileMenu = wx.Menu()
 
-        aboutItem = fileMenu.Append(wx.ID_ABOUT, "&About OpenCore Legacy Patcher")
+        aboutItem = fileMenu.Append(wx.ID_ABOUT, "&About OpenCore Legacy Patcher T2")
         fileMenu.AppendSeparator()
         revealLogItem = fileMenu.Append(wx.ID_ANY, "&Reveal Log File")
+        fileMenu.AppendSeparator()
+        # wx.ID_EXIT is required on macOS for Cmd+Q to be handled through wx's
+        # own event/menu system. Without a registered ID_EXIT item, wxWidgets
+        # never moves a "Quit" item into the Application menu, so macOS falls
+        # back to its own default termination path -- which bypasses
+        # wx.App.OnExit() and the frame's EVT_CLOSE handler entirely and tears
+        # the process down directly. That's what was corrupting the
+        # autorelease pool: our cleanup code was simply never being reached.
+        quitItem = fileMenu.Append(wx.ID_EXIT, "&Quit OpenCore Legacy Patcher T2\tCtrl+Q")
 
         menubar.Append(fileMenu, "&File")
         self.frame.SetMenuBar(menubar)
 
         self.frame.Bind(wx.EVT_MENU, lambda event: gui_about.AboutFrame(self.constants), aboutItem)
         self.frame.Bind(wx.EVT_MENU, lambda event: subprocess.run(["/usr/bin/open", "--reveal", self.constants.log_filepath]), revealLogItem)
+        self.frame.Bind(wx.EVT_MENU, lambda event: self.frame.Close(), quitItem)
+
+
+_app_exiting: bool = False
+
+
+def mark_app_exiting() -> None:
+    """
+    Marks that the app is in the process of quitting. Any background
+    thread that might otherwise touch a frame/widget while it's being
+    torn down (e.g. a network-bound update check finishing after the
+    user hit Cmd+Q) should check is_app_exiting() before doing so.
+    """
+    global _app_exiting
+    _app_exiting = True
+
+
+def is_app_exiting() -> bool:
+    return _app_exiting
+
+
+_active_pulses: set = set()
+
+
+def stop_all_pulses() -> None:
+    """
+    Stops every currently-running gauge pulse thread. Called from
+    PatcherApp.OnExit() so a pulse thread never survives past the
+    point where its underlying wx.Gauge gets torn down (which is
+    what corrupts the autorelease pool when quitting mid-animation).
+    """
+    for pulse in list(_active_pulses):
+        pulse.stop_pulse()
 
 
 class GaugePulseCallback:
@@ -105,6 +151,7 @@ class GaugePulseCallback:
         self.pulse_thread_active = True
         self.pulse_thread = threading.Thread(target=self._pulse)
         self.pulse_thread.start()
+        _active_pulses.add(self)
 
 
     def stop_pulse(self) -> None:
@@ -112,6 +159,7 @@ class GaugePulseCallback:
             return
         self.pulse_thread_active = False
         self.pulse_thread.join()
+        _active_pulses.discard(self)
 
 
     def _pulse(self) -> None:
@@ -316,4 +364,6 @@ class RestartHost:
                 applescript.AppleScript('tell app "loginwindow" to «event aevtrrst»').run()
             except applescript.ScriptError as e:
                 logging.error(f"Error while trying to reboot: {e}")
+                logging.exception("Stack Trace:")
+                logging.info("Go to Apple Logo > Restart and click on Restart to fix this issue.")
             sys.exit(0)

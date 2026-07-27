@@ -150,7 +150,7 @@ class SysPatchDisplayFrame(wx.Frame):
                     patch_label.SetLabel(patch_label.GetLabel().replace("-", ""))
                     patch_label.Centre(wx.HORIZONTAL)
 
-            if patches[HardwarePatchsetValidation.PATCHING_NOT_POSSIBLE] is True:
+            if patches[HardwarePatchsetValidation.PATCHING_NOT_POSSIBLE] is True or no_new_patches is True:
                 # Cannot patch due to the following reasons:
                 patch_label = wx.StaticText(frame, label="Cannot patch due to the following reasons:", pos=(-1, patch_label.GetPosition()[1] + 25))
                 patch_label.SetFont(gui_support.font_factory(13, wx.FONTWEIGHT_BOLD))
@@ -308,7 +308,7 @@ class SysPatchDisplayFrame(wx.Frame):
             # If commits are different, assume patches are as well
             return True
 
-        oclp_plist = "/System/Library/CoreServices/OpenCore-Legacy-Patcher.plist"
+        oclp_plist = "/System/Library/CoreServices/OCLP-Plus.plist"
         if not Path(oclp_plist).exists():
             # If it doesn't exist, no patches were ever installed
             # ie. all patches applicable

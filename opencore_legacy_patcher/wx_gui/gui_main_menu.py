@@ -13,6 +13,7 @@ import markdown2
 import threading
 import webbrowser
 import shutil
+import os
 from pathlib import Path
 from packaging import version
 
@@ -36,7 +37,6 @@ from ..wx_gui import (
     gui_update,
 )
 
-
 class MainFrame(wx.Frame):
     def __init__(self, parent: wx.Frame, title: str, global_constants: constants.Constants, screen_location: tuple = None):
         logging.info("Initializing Main Menu Frame")
@@ -59,9 +59,6 @@ class MainFrame(wx.Frame):
 
         self.Centre()
         self.Show()
-
-        # FIX: Sauberes Schließen abfangen, um macOS Autorelease-Pool-Crashes zu verhindern
-        self.Bind(wx.EVT_CLOSE, self.on_close_window)
 
         self._preflight_checks()
 
@@ -108,7 +105,7 @@ class MainFrame(wx.Frame):
             },
             "Support": {
                 "function": self.on_help,
-                "description": ["Resources for OpenCore Legacy", "Patcher."],
+                "description": ["Resources for OpenCore Legacy", "Patcher T2."],
                 "icon": str(self.constants.icns_resource_path / "OC-Support.icns"),
             },
         }
@@ -128,7 +125,11 @@ class MainFrame(wx.Frame):
             button = wx.Button(self, label=button_name, pos=(button_x + 70, button_y), size=(180, 30))
             button.SetFont(gui_support.font_factory(13, wx.FONTWEIGHT_NORMAL))
             button.Bind(wx.EVT_BUTTON, lambda event, f=button_function["function"]: f(event))
-            
+
+            if button_name == "Build and Install OpenCore" and not gui_support.CheckProperties(self.constants).host_can_build():
+                button.Disable()
+                button.SetToolTip("Building OpenCore is not supported on Hackintoshes or virtual machines. For installing OpenCore on Hackintoshes, follow Dortania's guide here: https://dortania.github.io/OpenCore-Install-Guide/")
+
             description_label = wx.StaticText(self, label='\n'.join(button_function["description"]), pos=(button_x + 75, button.GetPosition()[1] + 33))
             description_label.SetFont(gui_support.font_factory(10, wx.FONTWEIGHT_NORMAL))
 
@@ -256,7 +257,7 @@ class MainFrame(wx.Frame):
             if remote_version_str == local_version_str:
                 return
     
-        if getattr(self, 'exiting_app', False):
+        if getattr(self, 'exiting_app', False) or gui_support.is_app_exiting():
             return
 
         logging.info(f"Newer version detected: {remote_version_str}")
@@ -271,11 +272,11 @@ class MainFrame(wx.Frame):
             logging.error(f"Failed to fetch changelog text: {e}")
             logging.error(f"Es hat fehlgeschlagen, den Changelog-Text anzuzeigen: {e}")
 
-        if not getattr(self, 'exiting_app', False):
+        if not getattr(self, 'exiting_app', False) and not gui_support.is_app_exiting():
             wx.CallAfter(self.on_update, update_dict["Link"], remote_version_str, update_dict["Github Link"], changelog)
         
     def on_update(self, oclp_url: str, oclp_version: str, oclp_github_url: str, changelog_text: str):
-        if not self:
+        if not self or gui_support.is_app_exiting():
             return
 
         ID_GITHUB = wx.NewIdRef() if hasattr(wx, "NewIdRef") else wx.NewId()
@@ -379,41 +380,32 @@ class MainFrame(wx.Frame):
             wx.CallAfter(self.Destroy)
         except Exception as e:
             logging.error(f"We failed to open up Build and Install OpenCore: {e}")
+            logging.exception("Stack Trace:")
 
-    def on_post_install_root_patch(self, event: wx.Event = None):
+    def on_post_install_root_patch(self, event: wx.Event = None):    
         try:
             gui_sys_patch_display.SysPatchDisplayFrame(parent=self, title=self.title, global_constants=self.constants, screen_location=self.GetPosition())
         except Exception as e:
-            logging.error(f"We failed to open up Install drivers and patches: {e}")
+            logging.error(f"Failed to open Install drivers and patches: {e}")
+            logging.exception("Stack Trace:")
 
     def on_create_macos_installer(self, event: wx.Event = None):
         try:
             gui_macos_installer_download.macOSInstallerDownloadFrame(parent=self, title=self.title, global_constants=self.constants, screen_location=self.GetPosition())
         except Exception as e:
             logging.error(f"We failed to open up Download macOS: {e}")
+            logging.exception("Stack Trace:")
 
     def on_settings(self, event: wx.Event = None):
         try:
             gui_settings.SettingsFrame(parent=self, title=self.title, global_constants=self.constants, screen_location=self.GetPosition())
         except Exception as e:
             logging.error(f"We failed to open up Settings: {e}")
+            logging.exception("Stack Trace:")
 
     def on_help(self, event: wx.Event = None):
         try:
             gui_help.HelpFrame(parent=self, title=self.title, global_constants=self.constants, screen_location=self.GetPosition())
         except Exception as e:
             logging.error(f"We failed to open up Help: {e}")
-
-    def on_close_window(self, event: wx.Event):
-        """ Sauberes Entladen aller Cocoa-Ressourcen beim Schließen """
-        self.exiting_app = True
-        
-        # FIX: Offenes Gemini-Fenster vor App-Terminierung im Speicher killen
-        if getattr(self, 'active_gemini_frame', None):
-            try:
-                self.active_gemini_frame.Destroy()
-            except Exception:
-                pass
-                
-        wx.GetApp().SafeYield(None, True)
-        self.Destroy()
+            logging.exception("Stack Trace:")
