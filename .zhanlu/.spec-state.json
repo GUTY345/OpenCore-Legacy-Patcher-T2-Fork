@@ -1,0 +1,17 @@
+{
+  "initialized": true,
+  "lastUpdate": 1782452915814,
+  "version": "1.0.0",
+  "scriptCount": 10,
+  "templateCount": 5,
+  "integrity": {
+    "scriptsValid": true,
+    "templatesValid": true,
+    "missingFiles": []
+  },
+  "metadata": {
+    "initializedAt": 1781028894941,
+    "platform": "darwin",
+    "extensionVersion": "1.0.0"
+  }
+}

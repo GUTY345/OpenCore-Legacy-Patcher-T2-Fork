@@ -71,7 +71,7 @@ class StartAutomaticPatching:
             logging.info(f"- Found new version: {version}")
 
             app = wx.App()
-            mainframe = wx.Frame(None, -1, "OpenCore Legacy Patcher")
+            mainframe = wx.Frame(None, -1, self.constants.patcher_name)
 
             ID_GITHUB = wx.NewId()
             ID_UPDATE = wx.NewId()
@@ -93,8 +93,8 @@ Please check the Github page for more information about this release."""
             panel = wx.Panel(frame)
             sizer = wx.BoxSizer(wx.VERTICAL)
             sizer.AddSpacer(10)
-            self.title_text = wx.StaticText(panel, label="A new version of OpenCore Legacy Patcher T2 is available!")
-            self.description = wx.StaticText(panel, label=f"OpenCore Legacy Patcher T2 {version} is now available - You have {self.constants.patcher_version}{' (Nightly)' if not self.constants.commit_info[0].startswith('refs/tags') else ''}. Would you like to update?")
+            self.title_text = wx.StaticText(panel, label=f"A new version of {self.constants.patcher_name} is available!")
+            self.description = wx.StaticText(panel, label=f"{self.constants.patcher_name} {version} is now available - You have {self.constants.patcher_version_label}. Would you like to update?")
             self.title_text.SetFont(gui_support.font_factory(19, wx.FONTWEIGHT_BOLD))
             self.description.SetFont(gui_support.font_factory(13, wx.FONTWEIGHT_NORMAL))
             self.web_view = wx.html2.WebView.New(panel, style=wx.BORDER_SUNKEN)
@@ -165,12 +165,12 @@ Please check the Github page for more information about this release."""
 
                 warning_str = ""
                 if network_handler.NetworkUtilities("https://api.github.com/repos/albert-mueller/OpenCore-Legacy-Patcher-T2/releases/latest").verify_network_connection() is False:
-                    warning_str = f"""\n\nWARNING: We're unable to verify whether there are any new releases of OpenCore Legacy Patcher T2 on Github. Be aware that you may be using an outdated version for this OS. If you're unsure, verify on Github that OpenCore Legacy Patcher T2 {self.constants.patcher_version} is the latest official release"""
+                    warning_str = f"""\n\nWARNING: We're unable to verify whether there are any new releases of {self.constants.patcher_name} on Github. Be aware that you may be using an outdated version for this OS. If you're unsure, verify on Github that {self.constants.patcher_full_name} is the latest official release"""
 
                 args = [
                     "/usr/bin/osascript",
                     "-e",
-                    f"""display dialog "OpenCore Legacy Patcher T2 has detected you're running without Root Patches, and would like to install them.\n\nmacOS wipes all root patches during OS installs and updates, so they need to be reinstalled.\n\nFollowing Patches have been detected for your system: \n{patch_string}\nWould you like to apply these patches?{warning_str}" """
+                    f"""display dialog "{self.constants.patcher_name} has detected you're running without Root Patches, and would like to install them.\n\nmacOS wipes all root patches during OS installs and updates, so they need to be reinstalled.\n\nFollowing Patches have been detected for your system: \n{patch_string}\nWould you like to apply these patches?{warning_str}" """
                     f'with icon POSIX file "{self.constants.app_icon_path}"',
                 ]
                 output = subprocess.run(
@@ -229,7 +229,7 @@ Please check the Github page for more information about this release."""
         args = [
             "/usr/bin/osascript",
             "-e",
-            f"""display dialog "OpenCore Legacy Patcher has detected that you are booting {'a different' if self.constants.special_build else 'an outdated'} OpenCore build\n- Booted: {self.constants.computer.oclp_version}\n- Installed: {self.constants.patcher_version}\n\nWould you like to update the OpenCore bootloader?" """
+            f"""display dialog "{self.constants.patcher_name} has detected that you are booting {'a different' if self.constants.special_build else 'an outdated'} OpenCore build\n- Booted: {self.constants.computer.oclp_version}\n- Installed: {self.constants.patcher_version_label}\n\nWould you like to update the OpenCore bootloader?" """
             f'with icon POSIX file "{self.constants.app_icon_path}"',
         ]
         output = subprocess.run(
@@ -304,7 +304,7 @@ Please check the Github page for more information about this release."""
             args = [
                 "/usr/bin/osascript",
                 "-e",
-                f"""display dialog "OpenCore Legacy Patcher has detected that you are booting OpenCore from an USB or External drive.\n\nIf you would like to boot your Mac normally without a USB drive plugged in, you can install OpenCore to the internal hard drive.\n\nWould you like to launch OpenCore Legacy Patcher and install to disk?" """
+                f"""display dialog "{self.constants.patcher_name} has detected that you are booting OpenCore from an USB or External drive.\n\nIf you would like to boot your Mac normally without a USB drive plugged in, you can install OpenCore to the internal hard drive.\n\nWould you like to launch {self.constants.patcher_name} and install to disk?" """
                 f'with icon POSIX file "{self.constants.app_icon_path}"',
             ]
             output = subprocess.run(

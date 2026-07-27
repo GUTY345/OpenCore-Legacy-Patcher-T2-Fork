@@ -47,7 +47,7 @@ class Analytics:
     def __init__(self, global_constants: constants.Constants) -> None:
         self.constants: constants.Constants = global_constants
         self.unique_identity = str(self.constants.computer.uuid_sha1)
-        self.application =     str("OpenCore Legacy Patcher")
+        self.application =     str(self.constants.patcher_name)
         self.version =         str(self.constants.patcher_version)
         self.os =              str(self.constants.detected_os_version)
         self.model =           str(self.constants.computer.real_model)

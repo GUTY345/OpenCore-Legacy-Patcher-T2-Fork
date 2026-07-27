@@ -63,6 +63,10 @@ class BuildGraphicsAudio:
         Primarily for Mac Pros and systems with Nvidia Maxwell/Pascal GPUs
         """
 
+        if self.model == "MacBookPro15,1":
+            logging.info("- MacBookPro15,1: Skipping WhateverGreen-driven graphics handling while isolating persistent IOBufferCopyController bridge timeout.")
+            return
+
         if self.constants.allow_oc_everywhere is False and self.constants.serial_settings != "None":
             if not support.BuildSupport(self.model, self.constants, self.config).get_kext_by_bundle_path("WhateverGreen.kext")["Enabled"] is True:
                 support.BuildSupport(self.model, self.constants, self.config).enable_kext("WhateverGreen.kext", self.constants.whatevergreen_version, self.constants.whatevergreen_path)
@@ -323,6 +327,10 @@ class BuildGraphicsAudio:
 
         # This fork focuses only on MacBookPro15,1 — no other T2 model receives T2 audio handling
         is_t2_mac = self.model == "MacBookPro15,1"
+
+        if self.model == "MacBookPro15,1":
+            logging.info("- MacBookPro15,1: Skipping AppleALC.kext while isolating persistent IOBufferCopyController bridge timeout.")
+            return
 
         # T2 Macs on macOS Tahoe (Kernel 25.x) require AppleALC to resolve CoreAudio stalls
         if ((self.model in model_array.LegacyAudio or self.model in model_array.MacPro or is_t2_mac) 

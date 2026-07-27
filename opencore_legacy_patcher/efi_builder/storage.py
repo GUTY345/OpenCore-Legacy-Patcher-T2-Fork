@@ -45,6 +45,11 @@ class BuildStorage:
         self._pcie_handling()
         self._trim_handling()
 
+        if self.model == "MacBookPro15,1":
+            logging.info("- MacBookPro15,1: Enabling APFS/TRIM and third-party drive storage quirks for Tahoe installer disk operations")
+            self.config["Kernel"]["Quirks"]["SetApfsTrimTimeout"] = 0
+            self.config["Kernel"]["Quirks"]["ThirdPartyDrives"] = True
+
 
     def _ahci_handling(self) -> None:
         """

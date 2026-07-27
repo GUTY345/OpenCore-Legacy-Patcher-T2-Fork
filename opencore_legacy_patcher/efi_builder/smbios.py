@@ -18,7 +18,8 @@ from .. import constants
 
 from ..support import (
     utilities,
-    generate_smbios
+    generate_smbios,
+    global_settings,
 )
 from ..datasets import (
     smbios_data,
@@ -135,6 +136,11 @@ class BuildSMBIOS:
                     sys.exit(3)
         else:
             spoofed_model = self.constants.override_smbios
+
+        if self.model == "MacBookPro15,1":
+            logging.info("- MacBookPro15,1: Using MacBookPro16,4 SMBIOS identity for Tahoe installer PlatformSupport/J215 alignment")
+            spoofed_model = "MacBookPro16,4"
+
         logging.info(f"- Using Model ID: {spoofed_model}")
 
         spoofed_board = ""
@@ -170,7 +176,10 @@ class BuildSMBIOS:
         elif self.constants.serial_settings == "Minimal":
             try:
                 logging.info("- Using Minimal SMBIOS patching")
-                self.spoofed_model = self.model
+                if self.model == "MacBookPro15,1":
+                    logging.info("- MacBookPro15,1: Preserving MacBookPro16,4 Tahoe identity during Minimal SMBIOS patching")
+                else:
+                    self.spoofed_model = self.model
                 self._minimal_serial_patch()
             except Exception as e:
                 logging.error("Minimal SMBIOS spoofing failed because of the following error:")
@@ -203,6 +212,9 @@ class BuildSMBIOS:
                 self.config["PlatformInfo"]["Generic"]["SystemProductName"] = self.spoofed_model
                 self.config["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]["OCLP-Spoofed-SN"] = self.constants.custom_serial_number
                 self.config["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]["OCLP-Spoofed-MLB"] = self.constants.custom_board_serial_number
+
+        if self.model == "MacBookPro15,1":
+            self._apply_macbookpro151_tahoe_identity()
 
         # USB Map and CPUFriend Patching
         if (
@@ -300,9 +312,11 @@ class BuildSMBIOS:
         self.config["PlatformInfo"]["SMBIOS"]["BoardProduct"] = self.spoofed_board
 
         # Model (ensures tables are not mismatched, even if we're not spoofing)
-        self.config["PlatformInfo"]["DataHub"]["SystemProductName"] = self.model
-        self.config["PlatformInfo"]["SMBIOS"]["SystemProductName"] = self.model
-        self.config["PlatformInfo"]["SMBIOS"]["BoardVersion"] = self.model
+        table_model = self.spoofed_model if self.model == "MacBookPro15,1" else self.model
+        self.config["PlatformInfo"]["Generic"]["SystemProductName"] = table_model
+        self.config["PlatformInfo"]["DataHub"]["SystemProductName"] = table_model
+        self.config["PlatformInfo"]["SMBIOS"]["SystemProductName"] = table_model
+        self.config["PlatformInfo"]["SMBIOS"]["BoardVersion"] = table_model
 
         # Avoid incorrect Firmware Updates
         self.config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["run-efi-updater"] = "No"
@@ -381,3 +395,161 @@ class BuildSMBIOS:
         self.config["PlatformInfo"]["Generic"]["SystemUUID"] = str(uuid.uuid4()).upper()
         self.config["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]["OCLP-Spoofed-SN"] = sn
         self.config["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]["OCLP-Spoofed-MLB"] = mlb
+
+    def _read_existing_custom_identity(self) -> tuple[str, str]:
+        """Return previously configured custom SN/MLB without generating replacements."""
+        sn = self.constants.custom_serial_number or ""
+        mlb = self.constants.custom_board_serial_number or ""
+
+        if not sn or not mlb:
+            nvram_sn = utilities.get_nvram(
+                "OCLP-Spoofed-SN",
+                "4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",
+                decode=True,
+            )
+            nvram_mlb = utilities.get_nvram(
+                "OCLP-Spoofed-MLB",
+                "4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",
+                decode=True,
+            )
+            sn = sn or (nvram_sn or "")
+            mlb = mlb or (nvram_mlb or "")
+
+        if not sn or not mlb:
+            settings = global_settings.GlobalEnviromentSettings()
+            sn = sn or (settings.read_property("GUI:custom_serial_number") or "")
+            mlb = mlb or (settings.read_property("GUI:custom_board_serial_number") or "")
+
+        return sn.rstrip("\x00"), mlb.rstrip("\x00")
+
+    def _read_host_platform_uuid(self) -> str:
+        """Return the host IOPlatformUUID without synthesizing a replacement."""
+        try:
+            result = subprocess.run(
+                ["/usr/sbin/ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                check=False,
+            )
+        except Exception:
+            return ""
+
+        if result.returncode != 0:
+            return ""
+
+        for line in result.stdout.splitlines():
+            if '"IOPlatformUUID"' not in line:
+                continue
+            _, _, value = line.partition("=")
+            value = value.strip().strip('"')
+            try:
+                return str(uuid.UUID(value)).upper()
+            except ValueError:
+                logging.info("- MacBookPro15,1: Ignoring malformed IOPlatformUUID from host.")
+                return ""
+        return ""
+
+    def _read_host_rom(self) -> bytes:
+        """Return the host Wi-Fi hardware address as ROM bytes if it can be verified."""
+        try:
+            result = subprocess.run(
+                ["/usr/sbin/networksetup", "-listallhardwareports"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                check=False,
+            )
+        except Exception:
+            return b""
+
+        if result.returncode != 0:
+            return b""
+
+        current_port = ""
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if line.startswith("Hardware Port:"):
+                current_port = line.partition(":")[2].strip()
+                continue
+            if current_port != "Wi-Fi" or not line.startswith("Ethernet Address:"):
+                continue
+            mac = line.partition(":")[2].strip().replace(":", "")
+            if len(mac) != 12:
+                logging.info("- MacBookPro15,1: Ignoring malformed Wi-Fi ROM address from host.")
+                return b""
+            try:
+                return binascii.unhexlify(mac)
+            except (binascii.Error, ValueError):
+                logging.info("- MacBookPro15,1: Ignoring non-hex Wi-Fi ROM address from host.")
+                return b""
+        return b""
+
+    def _apply_macbookpro151_tahoe_identity(self) -> None:
+        """Keep MBP15,1 Tahoe spoofing aligned with existing persisted identity only."""
+        sn, mlb = self._read_existing_custom_identity()
+        if not sn or not mlb:
+            logging.info("- MacBookPro15,1: No persisted custom SN/MLB found; leaving serial fields unchanged.")
+            return
+
+        system_uuid = self._read_host_platform_uuid()
+        rom = self._read_host_rom()
+
+        logging.info("- MacBookPro15,1: Applying persisted custom SN/MLB to MacBookPro16,4 Tahoe identity.")
+        platform_info = self.config.setdefault("PlatformInfo", {})
+        generic = platform_info.setdefault("Generic", {})
+        smbios = platform_info.setdefault("SMBIOS", {})
+        datahub = platform_info.setdefault("DataHub", {})
+        platform_nvram = platform_info.setdefault("PlatformNVRAM", {})
+
+        platform_info["Automatic"] = True
+        platform_info["UpdateDataHub"] = True
+        platform_info["UpdateNVRAM"] = True
+        platform_info["UpdateSMBIOS"] = True
+        self.config.setdefault("UEFI", {}).setdefault("ProtocolOverrides", {})["DataHub"] = True
+
+        generic["SystemProductName"] = self.spoofed_model
+        generic["SystemSerialNumber"] = sn
+        generic["MLB"] = mlb
+        generic["MaxBIOSVersion"] = False
+        if system_uuid:
+            generic["SystemUUID"] = system_uuid
+        if rom:
+            generic["ROM"] = rom
+
+        smbios["SystemProductName"] = self.spoofed_model
+        smbios["BoardProduct"] = self.spoofed_board
+        smbios["BoardVersion"] = self.spoofed_model
+        smbios["ChassisSerialNumber"] = sn
+        smbios["SystemSerialNumber"] = sn
+        smbios["BoardSerialNumber"] = mlb
+        if system_uuid:
+            smbios["SystemUUID"] = system_uuid
+
+        datahub["SystemProductName"] = self.spoofed_model
+        datahub["BoardProduct"] = self.spoofed_board
+        datahub["SystemSerialNumber"] = sn
+        if system_uuid:
+            datahub["SystemUUID"] = system_uuid
+
+        platform_nvram["BID"] = self.spoofed_board
+        platform_nvram["SystemSerialNumber"] = sn
+        platform_nvram["MLB"] = mlb
+        if system_uuid:
+            platform_nvram["SystemUUID"] = system_uuid
+        if rom:
+            platform_nvram["ROM"] = rom
+
+        oclp_nvram = self.config.setdefault("NVRAM", {}).setdefault("Add", {}).setdefault(
+            "4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102", {}
+        )
+        oclp_nvram["OCLP-Spoofed-SN"] = sn
+        oclp_nvram["OCLP-Spoofed-MLB"] = mlb
+        if system_uuid:
+            logging.info("- MacBookPro15,1: Applied host IOPlatformUUID to spoofed Tahoe identity.")
+        else:
+            logging.info("- MacBookPro15,1: Host IOPlatformUUID unavailable; leaving SystemUUID unchanged.")
+        if rom:
+            logging.info("- MacBookPro15,1: Applied host Wi-Fi ROM to spoofed Tahoe identity.")
+        else:
+            logging.info("- MacBookPro15,1: Host Wi-Fi ROM unavailable; leaving ROM unchanged.")
