@@ -532,23 +532,24 @@ class BuildMiscellaneous:
             except Exception as e:
                 logging.info(f"- {self.model}: Great news! We tried disabling USB-Map.kext and USB-Map-Tahoe.kext but we didn't find them.")
                 logging.info("You don't have to worry about this message.")
-        try:
-            APPLE_NVRAM_UUID = "7C436110-AB2A-4BBB-A880-FE41995C9F82"
-            logging.info("- Skipping Language and Region selection (all T2 models)")
-            
-            # Format 'en-US:0' as a raw byte sequence terminated by a null byte or written as exact hex data
-            prev_lang_bytes = b"en-US:0"
-            
-            self._set_nvram_value(APPLE_NVRAM_UUID, "prev-lang:kbd", prev_lang_bytes, overwrite=True)
-            
-            # Force the global language/locale environment variables to anchor the region
-            self._set_nvram_value(APPLE_NVRAM_UUID, "AppleLanguages", ["en-US"], overwrite=True)
-            self._set_nvram_value(APPLE_NVRAM_UUID, "AppleLocale", "en_US", overwrite=True)
-        except Exception as e:
-            logging.error("We failed to skip language and region selection. It failed to do so because of the following error:")
-            logging.exception("Stack Trace:")
-            logging.info("Please try again later.")
-            sys.exit(3)
+        APPLE_NVRAM_UUID = "7C436110-AB2A-4BBB-A880-FE41995C9F82"
+
+        # DISABLED 2026-07-27: Setting prev-lang:kbd / AppleLanguages / AppleLocale
+        # caused the macOS Tahoe installer to show a gray screen with no UI on
+        # MacBookPro15,1 (and possibly other T2 models).  Re-enabling requires
+        # verifying that the installer windows still appear correctly.
+        #
+        # try:
+        #     logging.info("- Skipping Language and Region selection (all T2 models)")
+        #     prev_lang_bytes = b"en-US:0"
+        #     self._set_nvram_value(APPLE_NVRAM_UUID, "prev-lang:kbd", prev_lang_bytes, overwrite=True)
+        #     self._set_nvram_value(APPLE_NVRAM_UUID, "AppleLanguages", ["en-US"], overwrite=True)
+        #     self._set_nvram_value(APPLE_NVRAM_UUID, "AppleLocale", "en_US", overwrite=True)
+        # except Exception as e:
+        #     logging.error("We failed to skip language and region selection. It failed to do so because of the following error:")
+        #     logging.exception("Stack Trace:")
+        #     logging.info("Please try again later.")
+        #     sys.exit(3)
 
         try:
             logging.info("- Adding T2-specific boot arguments for macOS 15/26")
@@ -718,7 +719,7 @@ class BuildMiscellaneous:
                         "Identifier": "com.apple.driver.usb.AppleUSBVHCI",
                         "Base": "", "Count": 1, "MinKernel": "24.0.0", "MaxKernel": "", "Mask": b"", "ReplaceMask": b"", "Limit": 0, "Skip": 0,
                         "Find": binascii.unhexlify("554889E54157415641554154534883EC28"),
-                        "Replace": binascii.unhexlify("C39090909090909090909090909090")
+                        "Replace": binascii.unhexlify("C390909090909090909090909090909090")
                     }
                     if self._validate_patch(new_patch):
                         kernel_patches.append(new_patch)
@@ -732,7 +733,7 @@ class BuildMiscellaneous:
                         "Identifier": "com.apple.driver.usb.AppleUSBVHCI",
                         "Base": "", "Count": 1, "MinKernel": "24.0.0", "MaxKernel": "", "Mask": b"", "ReplaceMask": b"", "Limit": 0, "Skip": 0,
                         "Find": binascii.unhexlify("554889E5488B87A80300000FB6B7D0000000"),
-                        "Replace": binascii.unhexlify("C3909090909090909090909090909090")
+                        "Replace": binascii.unhexlify("C39090909090909090909090909090909090")
                     }
                     if self._validate_patch(new_patch):
                         kernel_patches.append(new_patch)
