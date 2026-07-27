@@ -763,16 +763,19 @@ class BuildMiscellaneous:
             #   for root hash failed: 22
             #   authenticate_efi_forwarded_roothash: failed with error: Invalid argument (22)
             # This causes the installer to hang during disk enumeration after
-            # the language selection screen.  Bypassing _authenticate_root_hash
-            # lets the APFS driver skip the T2 Secure Enclave root hash check
-            # that can't succeed on an unsupported USB installer.
+            # the language selection screen.  The normal macOS boot uses
+            # authenticate_root_hash (which works fine), but the USB installer
+            # boot path uses authenticate_efi_forwarded_roothash which fails
+            # because the T2 Secure Enclave can't verify the root hash of an
+            # unsupported USB installer.  We patch BOTH functions to cover
+            # whichever path the installer takes.
             try:
                 logging.info(f"- {self.model}: Bypassing APFS root hash validation for installer disk enumeration")
                 new_patch = {
                     "Arch": "x86_64",
                     "Identifier": "com.apple.filesystems.apfs",
-                    "Base": "_authenticate_root_hash",
-                    "Comment": "Bypass APFS root hash validation for T2 installer",
+                    "Base": "_authenticate_efi_forwarded_roothash",
+                    "Comment": "Bypass APFS EFI forwarded root hash validation for T2 installer",
                     "Count": 1,
                     "Enabled": True,
                     "MinKernel": "24.0.0",
@@ -784,7 +787,30 @@ class BuildMiscellaneous:
                     "Skip": 0
                 }
                 if self._validate_patch(new_patch):
-                    logging.info("- Injecting APFS root hash validation bypass patch")
+                    logging.info("- Injecting APFS EFI forwarded root hash validation bypass patch")
+                    kernel_patches.append(new_patch)
+            except Exception as e:
+                logging.error("Failed to inject APFS root hash validation bypass patch:")
+                logging.exception("Stack Trace:")
+
+            try:
+                new_patch = {
+                    "Arch": "x86_64",
+                    "Identifier": "com.apple.filesystems.apfs",
+                    "Base": "_authenticate_root_hash",
+                    "Comment": "Bypass APFS on-disk root hash validation for T2 installer",
+                    "Count": 1,
+                    "Enabled": True,
+                    "MinKernel": "24.0.0",
+                    "Find": b"",
+                    "Replace": binascii.unhexlify("B800000000C3"),
+                    "Mask": b"",
+                    "ReplaceMask": b"",
+                    "Limit": 0,
+                    "Skip": 0
+                }
+                if self._validate_patch(new_patch):
+                    logging.info("- Injecting APFS on-disk root hash validation bypass patch")
                     kernel_patches.append(new_patch)
             except Exception as e:
                 logging.error("Failed to inject APFS root hash validation bypass patch:")
