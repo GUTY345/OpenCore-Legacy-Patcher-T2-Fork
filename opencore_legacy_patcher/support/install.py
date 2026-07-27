@@ -2,6 +2,7 @@
 install.py: Installation of OpenCore files to ESP
 """
 
+import os
 import logging
 import plistlib
 import subprocess
@@ -16,6 +17,13 @@ from .. import constants
 class tui_disk_installation:
     def __init__(self, versions):
         self.constants: constants.Constants = versions
+
+    @staticmethod
+    def _is_efi_partition(partition: dict) -> bool:
+        """Recognize only an EFI/FAT EFI System Partition reported by diskutil."""
+        filesystem = str(partition.get("fs", "")).strip().lower()
+        content = str(partition.get("type", "")).strip().lower()
+        return filesystem in {"msdos", "efi"} or content in {"efi", "efi system partition"}
 
     def list_disks(self):
         all_disks = {}
@@ -45,8 +53,9 @@ class tui_disk_installation:
                 all_disks[disk["DeviceIdentifier"]] = {"identifier": disk_info["DeviceNode"], "name": disk_info.get("MediaName", "Disk"), "size": disk_info["TotalSize"], "partitions": {}}
                 for partition in disk["Partitions"]:
                     partition_info = plistlib.loads(subprocess.run(["/usr/sbin/diskutil", "info", "-plist", partition["DeviceIdentifier"]], stdout=subprocess.PIPE).stdout.decode().strip().encode())
+                    filesystem_type = partition_info.get("FilesystemType") or partition_info.get("Content", "")
                     all_disks[disk["DeviceIdentifier"]]["partitions"][partition["DeviceIdentifier"]] = {
-                        "fs": partition_info.get("FilesystemType", partition_info["Content"]),
+                        "fs": filesystem_type,
                         "type": partition_info["Content"],
                         "name": partition_info.get("VolumeName", ""),
                         "size": partition_info["TotalSize"],
@@ -57,7 +66,7 @@ class tui_disk_installation:
 
         supported_disks = {}
         for disk in all_disks:
-            if not any(all_disks[disk]["partitions"][partition]["fs"] in ("msdos", "EFI") for partition in all_disks[disk]["partitions"]):
+            if not any(self._is_efi_partition(all_disks[disk]["partitions"][partition]) for partition in all_disks[disk]["partitions"]):
                 continue
             supported_disks.update({
                 disk: {
@@ -81,7 +90,7 @@ class tui_disk_installation:
 
         supported_partitions = {}
         for partition in selected_disk["partitions"]:
-            if selected_disk["partitions"][partition]["fs"] not in ("msdos", "EFI"):
+            if not self._is_efi_partition(selected_disk["partitions"][partition]):
                 continue
             supported_partitions.update({
                 partition: {
@@ -96,6 +105,30 @@ class tui_disk_installation:
         if any(x in media_name for x in ("SD Card", "SD/MMC", "SDXC Reader", "SD Reader", "Card Reader")):
             return True
         return False
+
+    @staticmethod
+    def _run_esp_file_op(command: list, mount_path: Path) -> subprocess.CompletedProcess:
+        """
+        Execute a filesystem operation against the mounted ESP using the least
+        privilege that actually works on this macOS version.
+
+        macOS 15 Sequoia and newer serve msdos / EFI System Partitions through
+        FSKit in the console user's security session. Such a mount is owned by
+        and writable to the current user, while a command elevated via
+        osascript/root runs in a *different* session that FSKit rejects with
+        EPERM ("Operation not permitted") — this is what left the ESP empty.
+
+        So when the mount point is writable by the current user we run the
+        operation unprivileged; only on a traditional root-owned mount (older
+        macOS) do we fall back to root. The result is verified so a failed copy
+        raises loudly instead of silently producing an empty EFI.
+        """
+        if os.access(mount_path, os.W_OK):
+            result = subprocess_wrapper.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        else:
+            result = subprocess_wrapper.run_as_root(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess_wrapper.verify(result)
+        return result
 
     def install_opencore(self, full_disk_identifier: str):
         # TODO: Apple Script schlägt in Yosemite und älter fehl
@@ -134,44 +167,45 @@ class tui_disk_installation:
 
         # Start der Dateioperationen
         try:
-            # Da wir als Root gemountet haben, löschen/kopieren wir konsequent mit run_as_root
+            # ESP-Schreiboperationen laufen unprivilegiert, wenn das Volume dem
+            # aktuellen Benutzer gehört (FSKit auf macOS 15+); sonst als Root.
             if (mount_path / "EFI/OC").exists():
                 logging.info("Entferne existierenden EFI/OC Ordner")
                 logging.info("Removing existing EFI/OC folder")
-                subprocess_wrapper.run_as_root(["/bin/rm", "-rf", mount_path / "EFI/OC"])
+                self._run_esp_file_op(["/bin/rm", "-rf", str(mount_path / "EFI/OC")], mount_path)
 
             if (mount_path / "System").exists():
                 logging.info("Existierenden System Ordner wird entfernt")
                 logging.info("Removing existing System folder")
-                subprocess_wrapper.run_as_root(["/bin/rm", "-rf", mount_path / "System"])
+                self._run_esp_file_op(["/bin/rm", "-rf", str(mount_path / "System")], mount_path)
 
             if (mount_path / "boot.efi").exists():
                 logging.info("Existierende boot.efi wird entfernt")
                 logging.info("Removing existing boot.efi")
-                subprocess_wrapper.run_as_root(["/bin/rm", mount_path / "boot.efi"])
+                self._run_esp_file_op(["/bin/rm", str(mount_path / "boot.efi")], mount_path)
 
             logging.info("Die EFI-Volume mounten")
             logging.info("Mounting the EFI partition")
-            subprocess_wrapper.run_as_root(["/bin/mkdir", "-p", mount_path / "EFI"])
+            self._run_esp_file_op(["/bin/mkdir", "-p", str(mount_path / "EFI")], mount_path)
             logging.info("Kopiere OpenCore auf das EFI-Volume")
             logging.info("Copying OpenCore to the EFI partition")
-            subprocess_wrapper.run_as_root(["/bin/cp", "-r", str(self.constants.opencore_release_folder / "EFI/OC"), str(mount_path / "EFI/OC")])
-            subprocess_wrapper.run_as_root(["/bin/cp", "-r", str(self.constants.opencore_release_folder / "System"), str(mount_path / "System")])
+            self._run_esp_file_op(["/bin/cp", "-r", str(self.constants.opencore_release_folder / "EFI/OC"), str(mount_path / "EFI/OC")], mount_path)
+            self._run_esp_file_op(["/bin/cp", "-r", str(self.constants.opencore_release_folder / "System"), str(mount_path / "System")], mount_path)
 
             if (self.constants.opencore_release_folder / "boot.efi").exists():
                 logging.info("boot.efi wird zu die EFI-Partition kopiert")
                 logging.info("Copying boot.efi to the EFI partition")
-                subprocess_wrapper.run_as_root(["/bin/cp", str(self.constants.opencore_release_folder / "boot.efi"), str(mount_path / "boot.efi")])
+                self._run_esp_file_op(["/bin/cp", str(self.constants.opencore_release_folder / "boot.efi"), str(mount_path / "boot.efi")], mount_path)
 
             if self.constants.boot_efi is True:
                 logging.info("Bootstrap zu BOOTx64.efi konvertieren")
                 logging.info("Converting Bootstrap to BOOTx64.efi")
                 if (mount_path / "EFI/BOOT").exists():
-                    subprocess_wrapper.run_as_root(["/bin/rm", "-rf", mount_path / "EFI/BOOT"])
-                
-                subprocess_wrapper.run_as_root(["/bin/mkdir", "-p", mount_path / "EFI/BOOT"])
-                subprocess_wrapper.run_as_root(["/bin/mv", str(mount_path / "System/Library/CoreServices/boot.efi"), str(mount_path / "EFI/BOOT/BOOTx64.efi")])
-                subprocess_wrapper.run_as_root(["/bin/rm", "-rf", mount_path / "System"])
+                    self._run_esp_file_op(["/bin/rm", "-rf", str(mount_path / "EFI/BOOT")], mount_path)
+
+                self._run_esp_file_op(["/bin/mkdir", "-p", str(mount_path / "EFI/BOOT")], mount_path)
+                self._run_esp_file_op(["/bin/mv", str(mount_path / "System/Library/CoreServices/boot.efi"), str(mount_path / "EFI/BOOT/BOOTx64.efi")], mount_path)
+                self._run_esp_file_op(["/bin/rm", "-rf", str(mount_path / "System")], mount_path)
                 
         except Exception as e:
             logging.error(f"Dateioperation während der Installation fehlgeschlagen: {e}")
@@ -187,19 +221,19 @@ class tui_disk_installation:
             if self._determine_sd_card(sd_type) is True:
                 logging.info("SD-Karten Icon wird hinzugefügt")
                 logging.info("Adding SD Card icon")
-                subprocess_wrapper.run_as_root(["/bin/cp", str(self.constants.icon_path_sd), str(mount_path)])
+                self._run_esp_file_op(["/bin/cp", str(self.constants.icon_path_sd), str(mount_path)], mount_path)
             elif ssd_type is True:
                 logging.info("SSD Icon wird hinzugefügt")
                 logging.info("Adding SSD icon")
-                subprocess_wrapper.run_as_root(["/bin/cp", str(self.constants.icon_path_ssd), str(mount_path)])
+                self._run_esp_file_op(["/bin/cp", str(self.constants.icon_path_ssd), str(mount_path)], mount_path)
             elif disk_type == "USB":
                 logging.info("USB-Stick Icon wird hinzugefügt")
                 logging.info("Adding USB stick icon")
-                subprocess_wrapper.run_as_root(["/bin/cp", str(self.constants.icon_path_external), str(mount_path)])
+                self._run_esp_file_op(["/bin/cp", str(self.constants.icon_path_external), str(mount_path)], mount_path)
             else:
                 logging.info("internes Festplatten Icon wird hinzugefügt")
                 logging.info("Adding internal hard disk icon")
-                subprocess_wrapper.run_as_root(["/bin/cp", str(self.constants.icon_path_internal), str(mount_path)])
+                self._run_esp_file_op(["/bin/cp", str(self.constants.icon_path_internal), str(mount_path)], mount_path)
         except Exception as icon_error:
             logging.warning(f"Icon-Kopie fehlgeschlagen (nicht kritisch): {icon_error}")
             logging.warning(f"Copying the icons failed (not critical): {icon_error}")

@@ -1,54 +1,40 @@
-"""
-commit_info.py: Parse Commit Info from binary's info.plist
-"""
-
 import plistlib
-
 from pathlib import Path
-
+from typing import Tuple, Optional
 
 class ParseCommitInfo:
-
     def __init__(self, binary_path: str) -> None:
-        """
-        Parameters:
-            binary_path (str): Path to binary
-        """
+        self.binary_path = Path(binary_path)
+        self.plist_path = self._resolve_plist_path()
 
-        self.binary_path = str(binary_path)
-        self.plist_path = self._convert_binary_path_to_plist_path()
-
-
-    def _convert_binary_path_to_plist_path(self) -> str:
-        """
-        Resolve Info.plist path from binary path
-        """
-
-        if Path(self.binary_path).exists():
-            plist_path = self.binary_path.replace("MacOS/OpenCore-Patcher", "Info.plist")
-            if Path(plist_path).exists() and plist_path.endswith(".plist"):
-                return plist_path
+    def _resolve_plist_path(self) -> Optional[Path]:
+        # Suche im selben Verzeichnis wie die Binärdatei oder im übergeordneten "Resources"-Ordner
+        # Anstatt hartem .replace() suchen wir nach einer Info.plist in der Nähe
+        possible_paths = [
+            self.binary_path.parent.parent / "Contents" / "Info.plist",
+            self.binary_path.parent / "Info.plist"
+        ]
+        for p in possible_paths:
+            if p.exists():
+                return p
         return None
 
-
-    def generate_commit_info(self) -> tuple:
-        """
-        Generate commit info from Info.plist
-
-        Returns:
-            tuple: (Branch, Commit Date, Commit URL)
-        """
-
-        if self.plist_path:
-            plist_info = plistlib.load(Path(self.plist_path).open("rb"))
-            if "Github" in plist_info:
-                return (
-                    plist_info["Github"]["Branch"],
-                    plist_info["Github"]["Commit Date"],
-                    plist_info["Github"]["Commit URL"],
-                )
-        return (
-            "Running from source",
-            "Not applicable",
-            "",
-        )
+    def generate_commit_info(self) -> Tuple[str, str, str]:
+        if self.plist_path and self.plist_path.exists():
+            try:
+                with self.plist_path.open("rb") as f:
+                    plist_info = plistlib.load(f)
+                    github_data = plist_info.get("Github", {})
+                    
+                    return (
+                        github_data.get("Branch", "Unknown"),
+                        github_data.get("Commit Date", "Unknown"),
+                        github_data.get("Commit URL", ""),
+                    )
+            except (plistlib.InvalidFileException, OSError):
+                logging.error("Wir konnten nicht, Commit-Informationen zu bestimmen.")
+                logging.error("We couldn't identify the commit information.")
+                logging.exception("Stack Trace:")
+                pass
+                
+        return ("Running from source", "Not applicable", "")

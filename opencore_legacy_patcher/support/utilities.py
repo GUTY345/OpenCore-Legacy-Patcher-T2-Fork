@@ -139,6 +139,35 @@ def check_filesystem_type():
     return filesystem_type["FilesystemType"]
 
 
+def find_any_oclp_manifest(root_path: Path = None):
+    """
+    Search common locations for any OpenCore Legacy Patcher root-volume
+    manifest left behind by a previous root patch, regardless of which
+    OCLP version originally wrote it.
+
+    Returns the Path to the first manifest found, or None if none exists.
+    """
+    if root_path is None:
+        root_path = Path("/")
+
+    search_dirs = [
+        root_path / "System" / "Library" / "CoreServices",
+        root_path / "Library" / "Application Support" / "Dortania",
+    ]
+
+    for directory in search_dirs:
+        try:
+            if not directory.is_dir():
+                continue
+            for candidate in directory.glob("*opencore-legacy-patcher*"):
+                if candidate.is_file():
+                    return candidate
+        except (OSError, PermissionError):
+            continue
+
+    return None
+
+
 def csr_decode(os_sip):
     sip_int = py_sip_xnu.SipXnu().get_sip_status().value
     for i,  current_sip_bit in enumerate(sip_data.system_integrity_protection.csr_values):

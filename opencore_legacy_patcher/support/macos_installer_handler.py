@@ -135,7 +135,10 @@ class InstallerCreation():
 
         with script_location.open("w") as script:
             script.write(f'''#!/bin/bash
-erase_disk='/usr/sbin/diskutil eraseDisk HFS+ OCLP-Installer {disk}'
+# Explicitly create a GUID partition map so the installer has an EFI System
+# Partition available for OpenCore. Without GPT, removable media can be
+# created as FDisk/MBR and the EFI installer screen cannot find its ESP.
+erase_disk='/usr/sbin/diskutil eraseDisk HFS+ OCLP-Installer GPT {disk}'
 if $erase_disk; then
     "{createinstallmedia_path}" --volume /Volumes/OCLP-Installer --nointeraction{additional_args}
 fi

@@ -22,14 +22,11 @@ class CheckBinaryUpdates:
     def __init__(self, global_constants: constants.Constants) -> None:
         self.constants: constants.Constants = global_constants
         try:
-            logging.info("Suchen ob die Version valid ist")
             logging.info("Checking if the version is valid")
             self.binary_version = version.parse(self.constants.patcher_version)
         except version.InvalidVersion:
-            logging.error("Da die Version nicht valid ist, werden keine automatische Updates durchgeführt.")
             logging.error("Since the version is not valid, we will not install any automatic updates.")
             logging.exception("Stack Trace:")
-            logging.info("Bitte manuell nach Updates in GitHub suchen.")
             logging.info("Please check for updates in GitHub manually.")
             assert self.constants.special_build is True, "Invalid version number for binary"
             # Special builds will not have a proper version number
@@ -48,8 +45,6 @@ class CheckBinaryUpdates:
             bool: True if the provided version is newer, False if not
         """
         if self.constants.special_build is True:
-            logging.info("Das ist eine spezielle Version. Automatische Updates sind temporär deaktiviert und sie zu aktivieren, Sie müssen zu eine Standard-Release umsteigen.")
-            logging.info("Bitte suchen Sie manuell nach Updates in GitHub.")
             logging.info("This is a special version. Automatic updates are permanently disabled and to be enabled, you need to switch to a standard release.")
             logging.info("Please check for updates in GitHub manually.")
             return False
@@ -74,7 +69,6 @@ class CheckBinaryUpdates:
                 first_version = version.parse(first_version)
             except version.InvalidVersion:
                 # Special build > release build: assume special build is newer
-                logging.error("Es gibt einen Problem zu aktualisieren. Bitte suchen Sie manuell nach Updates.")
                 logging.error("There is a problem to update. Please search for updates manually.")
                 logging.exception("Stack Trace:")
                 return True
@@ -84,15 +78,12 @@ class CheckBinaryUpdates:
                 second_version = version.parse(second_version)
             except version.InvalidVersion:
                 # Release build > special build: assume special build is newer
-                logging.error("Es gibt einen Problem zu aktualisieren. Bitte suchen Sie manuell nach Updates.")
                 logging.error("There is a problem to update. Please search for updates manually.")
                 logging.exception("Stack Trace:")
                 return False
 
         if first_version == second_version:
-            if not self.constants.commit_info[0].startswith("refs/tags"):
-                # Check for nightly builds
-                return True
+            logging.info("You are on the latest version available already.")
 
         return first_version > second_version
 
@@ -106,7 +97,6 @@ class CheckBinaryUpdates:
 
         if self.constants.special_build is True:
             # Special builds do not get updates through the updater
-            logging.info("Sie verwenden eine spezielle Version")
             logging.info("You are using a special version")
             return None
 
@@ -115,14 +105,10 @@ class CheckBinaryUpdates:
             return self.latest_details
 
         if not network_handler.NetworkUtilities(REPO_LATEST_RELEASE_URL).verify_network_connection():
-            logging.error("Es hat fehlgeschlagen, einen Internetverbindung mit die GitHub-Webseite zu herstellen.")
             logging.error("It failed to connect with the GitHub page")
-            logging.info("Bitte sehen Sie, ob Ihr Computer mit den Internet verbunden ist.")
             logging.info("Please check if your computer is connected to the internet.")
             logging.exception("Stack Trace:")
-            logging.info("Falls Ihren Computer mit Internet verbunden ist, ist es möglich zu sein, dass es um nicht valider Syntax handelt.")
             logging.info("If your computer is connected to the internet, it may be due to invalid syntax.")
-            logging.info("Falls so, sollten Sie das Problem sofort melden.")
             logging.info("If so, report this issue immediately")
             return None
             
@@ -135,30 +121,23 @@ class CheckBinaryUpdates:
         # The release marked as latest will always be stable, and thus, have a proper version number
         # But if not, let's not crash the program
         try:
-            logging.info("Suchen ob die Version valid ist")
             logging.info("Checking if the version is valid")
             latest_remote_version = version.parse(data_set["tag_name"])
         except version.InvalidVersion:
-            logging.error(f"Diese Version ist nicht valid")
             logging.error(f"That version is invalid")
             logging.exception("Stack Trace:")
-            logging.info("Bitte suchen Sie manuell nach Updates in GitHub.")
             logging.info("Please check for updates in GitHub manually.")
             return None
 
         # Fixed: Swap the parameters so that the remote version is tested against the local one properly.
         # Alternatively, you can also just pass (self.binary_version, latest_remote_version)
         if not self._check_if_build_newer(latest_remote_version, self.binary_version):
-            logging.info("Sie sind bereits auf die letzte Version.")
             logging.info("You are already on the latest version.")
-            logging.info("Falls diese Nachricht noch erscheint auch wenn es nicht aktuell ist, sollten Sie sofort melden.")
             logging.info("If this meessage appears even if it's not up to date, you should report this issue.")
-            logging.info("Für meisten Voralphas dieses Verhalten ist normal, weil diverse Version als Pre-release markiert ist.")
             logging.info("For most pre-alpha versions, this behavior is normal because various versions are marked as pre-release.")
             return None
 
         for asset in data_set["assets"]:
-            logging.info("Einen neue Version ist verfügbar")
             logging.info("A new version is available")
             logging.info(f"Found asset: {asset['name']}")
             if asset["name"] == "OpenCore-Patcher.pkg":

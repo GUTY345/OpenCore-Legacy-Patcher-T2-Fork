@@ -58,6 +58,13 @@ class NetworkUtilities:
             return requests.Response()
 
 class DownloadObject:
+    # A single stalled socket read (common on swcdn.apple.com over long
+    # multi-GB transfers) should not discard an otherwise-healthy download.
+    # These control how many times a transient network error is retried,
+    # resuming via HTTP Range instead of restarting from byte 0.
+    MAX_DOWNLOAD_RETRIES = 5
+    RETRY_BACKOFF_BASE_SECONDS = 3
+
     def __init__(self, url: str, path: str, checksum_algo: Optional["hashlib._Hash"] = None) -> None:
         try:
             self.url = url
@@ -155,6 +162,10 @@ class DownloadObject:
 
     def download(self, display_progress: bool = False, spawn_thread: bool = True) -> None:
         """Call this from your UI. If spawn_thread is False, it runs synchronously."""
+        # Set status synchronously before the worker thread is scheduled, so callers
+        # polling is_active() right after this call never see the pre-thread INACTIVE
+        # state and mistake "not started yet" for "failed".
+        self.status = DownloadStatus.DOWNLOADING
         if spawn_thread:
             import threading
             threading.Thread(target=self._download, args=(display_progress,), daemon=True).start()
@@ -179,28 +190,44 @@ class DownloadObject:
             if not self._prepare_working_directory(self.filepath):
                 raise IOError(f"Could not prepare working directory: {self.error_msg}")
 
-            # Stage 3: Request Execution with detailed logging
-            logging.info("Netzwerkstream wird geöffnet...")
-            logging.debug("Opening network stream...")
-            response = NetworkUtilities().get(self.url, stream=True, timeout=15)
-            
-            # Check for HTTP errors early
-            if response.status_code != 200:
-                raise requests.exceptions.HTTPError(f"HTTP Status Code {response.status_code}")
-
-            with open(self.filepath, 'wb') as file:
-                for i, chunk in enumerate(response.iter_content(chunk_size=1024 * 1024)):
+            # Stage 3: Request Execution with detailed logging.
+            # A stalled socket read is a transient condition, not a fatal
+            # one - retry it a bounded number of times, resuming from the
+            # last confirmed byte via a Range request, instead of failing
+            # (and forcing a full restart of) the entire download.
+            attempt = 0
+            while True:
+                try:
+                    self._download_stream()
+                    break
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
+                        requests.exceptions.ChunkedEncodingError) as transient_error:
                     if self.should_stop:
-                        logging.warning(f"Herunterladen gestoppt von Benutzer auf {self.downloaded_file_size} bytes.")
-                        logging.warning(f"Download stopped by user at {self.downloaded_file_size} bytes.")
-                        raise InterruptedError("Download manually aborted.")
-                    
-                    if chunk:
-                        file.write(chunk)
-                        self.downloaded_file_size += len(chunk)
-                        if self._checksum_storage:
-                            self._checksum_storage.update(chunk)
-                            
+                        raise
+                    attempt += 1
+                    if attempt > self.MAX_DOWNLOAD_RETRIES:
+                        logging.error(f"Maximale Anzahl an Wiederholungsversuchen ({self.MAX_DOWNLOAD_RETRIES}) erreicht, gebe auf.")
+                        logging.error(f"Exhausted maximum retries ({self.MAX_DOWNLOAD_RETRIES}), giving up.")
+                        raise
+                    wait = min(self.RETRY_BACKOFF_BASE_SECONDS * (2 ** (attempt - 1)), 30)
+                    logging.warning(
+                        f"Netzwerkfehler beim Herunterladen (Versuch {attempt}/{self.MAX_DOWNLOAD_RETRIES}), "
+                        f"setze in {wait}s bei Byte {int(self.downloaded_file_size)} fort: {transient_error}"
+                    )
+                    logging.warning(
+                        f"Transient network error while downloading (attempt {attempt}/{self.MAX_DOWNLOAD_RETRIES}), "
+                        f"resuming in {wait}s from byte {int(self.downloaded_file_size)}: {transient_error}"
+                    )
+                    time.sleep(wait)
+
+            # The retry/resume refactor above updates the running hash incrementally
+            # in _download_stream(), but never finalized it into self.checksum - so
+            # this stayed None forever and every _validate_installer() comparison
+            # against the expected checksum failed unconditionally, even for a
+            # perfectly good download. Finalize it here, once, after a full success.
+            if self._checksum_storage:
+                self.checksum = self._checksum_storage.hexdigest()
+
             self.download_complete = True
             logging.info(f"Herunterladen vollständig abgeschlossen: {self.filename}")
             logging.info(f"Successfully finished download: {self.filename}")
@@ -220,6 +247,59 @@ class DownloadObject:
             utilities.enable_sleep_after_running()
             logging.info("Netzwerkressourcen freigegeben und Energiespareinstellungen wiederhergestellt.")
             logging.info("Network resources released and sleep settings restored.")
+
+    def _download_stream(self) -> None:
+        """
+        Opens the network stream and writes chunks to disk.
+
+        If bytes have already been written from a previous attempt, resumes
+        via a Range header instead of restarting the file from scratch.
+        Raises the underlying exception on any network problem or user
+        abort - the caller in _download() decides whether that's worth
+        retrying.
+        """
+        logging.info("Netzwerkstream wird geöffnet...")
+        logging.debug("Opening network stream...")
+
+        headers = {}
+        mode = 'wb'
+        if self.downloaded_file_size > 0:
+            headers['Range'] = f"bytes={int(self.downloaded_file_size)}-"
+            mode = 'ab'
+
+        # Talk to the session directly here (rather than through
+        # NetworkUtilities.get, which swallows connection/timeout errors
+        # into an empty Response) so transient failures surface as real
+        # exceptions that the retry loop in _download() can catch.
+        response = SESSION.get(self.url, stream=True, timeout=15, headers=headers)
+
+        # 200 = full response, 206 = partial/resumed response.
+        if response.status_code not in (200, 206):
+            raise requests.exceptions.HTTPError(f"HTTP Status Code {response.status_code}")
+
+        if response.status_code == 200 and mode == 'ab':
+            # Server ignored our Range request and is resending the whole
+            # file - restart the file on disk so it isn't corrupted.
+            logging.warning("Server hat Range-Anfrage ignoriert, Download wird neu gestartet.")
+            logging.warning("Server ignored Range request, restarting download from scratch.")
+            mode = 'wb'
+            self.downloaded_file_size = 0.0
+            if self._checksum_storage:
+                self._checksum_storage = self._checksum_storage.__class__()
+
+        with open(self.filepath, mode) as file:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if self.should_stop:
+                    logging.warning(f"Herunterladen gestoppt von Benutzer auf {self.downloaded_file_size} bytes.")
+                    logging.warning(f"Download stopped by user at {self.downloaded_file_size} bytes.")
+                    raise InterruptedError("Download manually aborted.")
+
+                if chunk:
+                    file.write(chunk)
+                    self.downloaded_file_size += len(chunk)
+                    if self._checksum_storage:
+                        self._checksum_storage.update(chunk)
+
     def _prepare_working_directory(self, path: Path) -> bool:
         try:
             if path.exists(): path.unlink()
