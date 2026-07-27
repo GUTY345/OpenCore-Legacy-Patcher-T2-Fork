@@ -183,7 +183,7 @@ class BuildMiscellaneous:
         """
         
         re_patch_args = []
-        # Exp B6: sbvmm MUST be injected for T2 Macs regardless of allow_oc_everywhere
+        # sbvmm MUST be injected for T2 Macs regardless of allow_oc_everywhere
         # or serial_settings.  macOS Tahoe's installer preflight checks
         # SupportedDeviceModels via RestrictEvents at install time.  Without sbvmm,
         # T2 boards (J680AP / MacBookPro15,1) fail with BIPreflightError Code 9.
@@ -531,7 +531,7 @@ class BuildMiscellaneous:
                 logging.info(f"- Enabling {kext}")
                 builder.enable_kext(kext, ver, path)
 
-        # Exp B7: WhateverGreen is KEPT ENABLED for T2 to process igfxonln=1,
+        # WhateverGreen is KEPT ENABLED for T2 to process igfxonln=1,
         # igfxfw=2, agdpmod=vit9696, -wegnoegpu boot-args.  Note: WEG probe()
         # may fail on Tahoe — if so, these args are simply not processed (harmless).
         # DeviceProperties injection (ig-platform-id, disable-gpu) works without WEG
@@ -816,72 +816,32 @@ class BuildMiscellaneous:
                 logging.error("Failed to inject APFS root hash validation bypass patch:")
                 logging.exception("Stack Trace:")
 
-            # Exp B7: AppleSEPKeyStore / AppleSEPManager board-id and imageboot
-            # bypass patches — RE-VERIFIED 2026-07-27 against real Tahoe 26.x
-            # BootKernelExtensions.kc.  Both patches are DEFERRED because:
-            #
-            # 1) The board-id comparison during imageboot happens in the kernel
-            #    (imageboot.c), NOT in the AppleKeyStore kext.  The only LEA
-            #    xref to "board-id" inside AppleKeyStore is in the getter
-            #    _kernel_shared_platform_get_board_id (0xffffff8001aa71a2),
-            #    which simply returns the string — it does NOT compare.
-            #
-            # 2) All attestation/ECID/model symbols (_encode_attestation,
-            #    _gen_attestation_request, _aks_attest_context_verify, etc.)
-            #    live in com.apple.driver.AppleKeyStore, NOT in
-            #    com.apple.driver.AppleSEPManager.  The SEPManager kext has
-            #    zero attestation-related symbols.
-            #
-            # 3) Generic prolog Find patterns (Base:"") match hundreds of
-            #    functions and would patch the WRONG function.  Until exact
-            #    target symbols are identified, these must stay disabled.
-            #
-            # The board-id mismatch is already addressed at the firmware layer:
-            # - Booter patches "Skip Board ID check" + "Reroute HW_BID to OC_BID"
-            # - Coprocessor DeviceProperties injection (board-id spoof "J680AP")
+            # ----------------------------------------------------------------
+            # Phase 3: Attestation bypass patches (AppleKeyStore)
+            # ----------------------------------------------------------------
+            # The attestation chain in AppleKeyStore is:
+            #   gen_attestation_request() → encode_attestation()
+            #   → validate_attestation_nonce() → success
+            # If any step fails or hangs, the entire installer disk
+            # enumeration stalls because APFS volume verification
+            # depends on AppleKeyStore ↔ SEP communication.
+            # We patch the three core attestation functions to return
+            # 0 (success) immediately, bypassing the SEP round-trip.
 
-            # [DEFERRED] Patch: Bypass AppleKeyStore board-id validation during imageboot
-            # RE finding: No board-id COMPARISON function exists in AppleKeyStore.
-            # The "board-id" string xref is only in _kernel_shared_platform_get_board_id
-            # which is a getter, not a checker.  The actual board-id check is in the
-            # kernel's imageboot.c (not patchable via kext patch).
-            # DEFERRED: Need kernel-level patch approach, or rely on Booter patches.
-            if not any(p.get("Comment") == "Bypass SEPKeyStore board-id check (imageboot)" for p in kernel_patches):
+            # Phase 3.1: validate_attestation_nonce → return 0
+            # RE-VERIFIED 2026-07-27: symbol exists in Tahoe
+            # BootKernelExtensions.kc AppleKeyStore with prolog
+            # 55 48 89 e5 53 50 48 85 ff 0f 95 c0
+            if not any(p.get("Comment") == "Bypass attestation: validate_attestation_nonce (Phase 3)" for p in kernel_patches):
                 new_patch = {
                     "Arch": "x86_64",
-                    "Base": "",
-                    "Comment": "Bypass SEPKeyStore board-id check (imageboot)",
-                    "Count": 1,
-                    "Enabled": False,  # DEFERRED: no valid target function in AppleKeyStore
                     "Identifier": "com.apple.driver.AppleKeyStore",
-                    "MinKernel": "25.0.0",
-                    "MaxKernel": "",
-                    "Find": binascii.unhexlify("554889E5415741565350"),
-                    "Replace": binascii.unhexlify("31C0C390909090909090"),
-                    "Mask": b"",
-                    "ReplaceMask": b"",
-                    "Limit": 0,
-                    "Skip": 0
-                }
-                if self._validate_patch(new_patch):
-                    logging.info("- Exp B7: SEPKeyStore board-id patch (DEFERRED — no target in AppleKeyStore)")
-                    kernel_patches.append(new_patch)
-
-            # [DEFERRED] Patch: Bypass AppleSEPManager ECID/hardware model validation
-            # RE finding: All attestation/ECID symbols are in com.apple.driver.AppleKeyStore,
-            # NOT in com.apple.driver.AppleSEPManager.  Wrong kext identifier.
-            # DEFERRED: Need to identify correct kext + exact target symbol.
-            if not any(p.get("Comment") == "Bypass SEPManager ECID/model check (installer)" for p in kernel_patches):
-                new_patch = {
-                    "Arch": "x86_64",
-                    "Base": "",
-                    "Comment": "Bypass SEPManager ECID/model check (installer)",
+                    "Base": "_validate_attestation_nonce",
+                    "Comment": "Bypass attestation: validate_attestation_nonce (Phase 3)",
                     "Count": 1,
-                    "Enabled": False,  # DEFERRED: wrong kext, no attestation symbols in SEPManager
-                    "Identifier": "com.apple.driver.AppleSEPManager",
-                    "MinKernel": "25.0.0",
-                    "MaxKernel": "",
-                    "Find": binascii.unhexlify("554889E541574156534883EC"),
+                    "Enabled": True,
+                    "MinKernel": "24.0.0",
+                    "Find": binascii.unhexlify("554889E553504885FF0F95C0"),
                     "Replace": binascii.unhexlify("31C0C3909090909090909090"),
                     "Mask": b"",
                     "ReplaceMask": b"",
@@ -889,7 +849,111 @@ class BuildMiscellaneous:
                     "Skip": 0
                 }
                 if self._validate_patch(new_patch):
-                    logging.info("- Exp B7: SEPManager ECID/model patch (DEFERRED — wrong kext target)")
+                    logging.info("- Phase 3: Injecting validate_attestation_nonce bypass")
+                    kernel_patches.append(new_patch)
+
+            # Phase 3.2: gen_attestation_request → return 0 (NULL buffer)
+            # RE-VERIFIED 2026-07-27: symbol exists in Tahoe
+            # BootKernelExtensions.kc AppleKeyStore with prolog
+            # 55 48 89 e5 41 57 41 56 41 55 41 54 53 48 81 ec d8 01 00 00 (20B)
+            if not any(p.get("Comment") == "Bypass attestation: gen_attestation_request (Phase 3)" for p in kernel_patches):
+                new_patch = {
+                    "Arch": "x86_64",
+                    "Identifier": "com.apple.driver.AppleKeyStore",
+                    "Base": "_gen_attestation_request",
+                    "Comment": "Bypass attestation: gen_attestation_request (Phase 3)",
+                    "Count": 1,
+                    "Enabled": True,
+                    "MinKernel": "24.0.0",
+                    "Find": binascii.unhexlify("554889E54157415641554154534881ECD8010000"),
+                    "Replace": binascii.unhexlify("31C0C39090909090909090909090909090909090"),
+                    "Mask": b"",
+                    "ReplaceMask": b"",
+                    "Limit": 0,
+                    "Skip": 0
+                }
+                if self._validate_patch(new_patch):
+                    logging.info("- Phase 3: Injecting gen_attestation_request bypass")
+                    kernel_patches.append(new_patch)
+
+            # Phase 3.3: encode_attestation → return 0 (success)
+            # RE-VERIFIED 2026-07-27: symbol exists in Tahoe
+            # BootKernelExtensions.kc AppleKeyStore with prolog
+            # 55 48 89 e5 41 57 41 56 41 55 41 54 53 48 81 ec 88 00 00 00 (20B)
+            if not any(p.get("Comment") == "Bypass attestation: encode_attestation (Phase 3)" for p in kernel_patches):
+                new_patch = {
+                    "Arch": "x86_64",
+                    "Identifier": "com.apple.driver.AppleKeyStore",
+                    "Base": "_encode_attestation",
+                    "Comment": "Bypass attestation: encode_attestation (Phase 3)",
+                    "Count": 1,
+                    "Enabled": True,
+                    "MinKernel": "24.0.0",
+                    "Find": binascii.unhexlify("554889E54157415641554154534881EC88000000"),
+                    "Replace": binascii.unhexlify("31C0C39090909090909090909090909090909090"),
+                    "Mask": b"",
+                    "ReplaceMask": b"",
+                    "Limit": 0,
+                    "Skip": 0
+                }
+                if self._validate_patch(new_patch):
+                    logging.info("- Phase 3: Injecting encode_attestation bypass")
+                    kernel_patches.append(new_patch)
+
+            # ----------------------------------------------------------------
+            # Phase 4: Broader T2 bypass patches
+            # ----------------------------------------------------------------
+
+            # Phase 4.1: SEPManager panic → unconditional jump past panic
+            # From issue #39 community fix (Mac mini 2018 verified).
+            # The conditional jump (jne +0x4F) is changed to unconditional
+            # (jmp +0x4F) so the panic path is never taken.  This prevents
+            # SEPManager from panicking when it can't reach the T2 bridge
+            # during installer disk enumeration.
+            if not any(p.get("Comment") == "Bypass SEPManager panic on SEP timeout (Phase 4)" for p in kernel_patches):
+                new_patch = {
+                    "Arch": "x86_64",
+                    "Identifier": "com.apple.driver.AppleSEPManager",
+                    "Base": "",
+                    "Comment": "Bypass SEPManager panic on SEP timeout (Phase 4)",
+                    "Count": 1,
+                    "Enabled": True,
+                    "MinKernel": "24.0.0",
+                    "Find": binascii.unhexlify("4883BFB003000000754F"),
+                    "Replace": binascii.unhexlify("4883BFB003000000EB4F"),
+                    "Mask": b"",
+                    "ReplaceMask": b"",
+                    "Limit": 0,
+                    "Skip": 0
+                }
+                if self._validate_patch(new_patch):
+                    logging.info("- Phase 4: Injecting SEPManager panic→return patch")
+                    kernel_patches.append(new_patch)
+
+            # Phase 4.2: XHCI event timeout increase (10 → 255)
+            # From issue #39 community fix.  Increases the USB event wait
+            # timeout from 10 to 255 to prevent premature timeout on T2
+            # bridge initialization.  Note: the exact kext this targets
+            # on Tahoe is unknown — this Find may not match.  Kept
+            # disabled until RE confirms the target kext identifier.
+            if not any(p.get("Comment") == "XHCI event timeout increase (Phase 4)" for p in kernel_patches):
+                new_patch = {
+                    "Arch": "x86_64",
+                    "Identifier": "com.apple.driver.usb.AppleUSBXHCI",
+                    "Base": "",
+                    "Comment": "XHCI event timeout increase (Phase 4)",
+                    "Count": 1,
+                    "Enabled": False,  # disabled until kext identifier verified on Tahoe
+                    "MinKernel": "24.0.0",
+                    "Find": binascii.unhexlify("4183FC0A"),
+                    "Replace": binascii.unhexlify("4183FCFF"),
+                    "Mask": b"",
+                    "ReplaceMask": b"",
+                    "Limit": 0,
+                    "Skip": 0
+                }
+                if self._validate_patch(new_patch):
+                    logging.info("- Phase 4: XHCI event timeout patch (DISABLED — awaiting kext verification)")
                     kernel_patches.append(new_patch)
 
         except Exception as e:
@@ -897,6 +961,50 @@ class BuildMiscellaneous:
             logging.exception("Stack Trace:")
             logging.info("Please try again later.")
             sys.exit(3)
+
+        # Phase 4.3: Block AppleT2SMC and IOBufferCopyController kexts
+        # From issue #39 community fix.  AppleT2SMC causes 800MHz CPU
+        # throttling on unsupported T2 Macs, and IOBufferCopyController
+        # triggers bridge DMA timeouts.  Blocking both prevents panics
+        # during installer initialization.
+        try:
+            logging.info("- Phase 4: Blocking problematic T2 kexts (AppleT2SMC, IOBufferCopyController)")
+            block_idents = [
+                ("com.apple.driver.AppleT2SMC", "Prevent T2 SMC throttling panic (Phase 4)"),
+                ("com.apple.iokit.IOBufferCopyController", "Prevent bridge DMA timeout panic (Phase 4)"),
+            ]
+            self.config.setdefault("Kernel", {}).setdefault("Block", [])
+            for identifier, comment in block_idents:
+                existing = builder.get_item_by_kv(self.config["Kernel"]["Block"], "Identifier", identifier)
+                if existing:
+                    existing["Enabled"] = True
+                    logging.info(f"  > Enabled existing Block entry for {identifier}")
+                else:
+                    self.config["Kernel"]["Block"].append({
+                        "Arch": "x86_64",
+                        "Comment": comment,
+                        "Enabled": True,
+                        "Identifier": identifier,
+                        "MaxKernel": "",
+                        "MinKernel": "24.0.0",
+                        "Strategy": "Exclude"
+                    })
+                    logging.info(f"  > Added Block entry for {identifier}: {comment}")
+        except Exception as e:
+            logging.error("Failed to block problematic T2 kexts:")
+            logging.exception("Stack Trace:")
+
+        # Phase 4.4: BridgeOS version spoof
+        # From issue #39 community fix.  Spoofing the bridgeOS version
+        # and status prevents the T2 bridge from rejecting installer
+        # communication due to version mismatch.
+        try:
+            logging.info("- Phase 4: Spoofing bridgeOS version for T2 installer compatibility")
+            self._set_nvram_value(APPLE_NVRAM_UUID, "bridge-os-version", "23.16.15067.0.0,0", overwrite=True)
+            self._set_nvram_value(APPLE_NVRAM_UUID, "t2-bridge-status", "01", overwrite=True)
+        except Exception as e:
+            logging.error("Failed to spoof bridgeOS version:")
+            logging.exception("Stack Trace:")
 
             
         # Bypass osinstallersetupd bridge device validation checks (Fixes Attestation Error -10000)
