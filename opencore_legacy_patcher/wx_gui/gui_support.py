@@ -189,6 +189,9 @@ class CheckProperties:
         """
         Check if host supports building OpenCore configs
         """
+        build_model = self.constants.custom_model or self.constants.computer.real_model
+        if build_model in model_array.UnsupportedT2Macs:
+            return False
         if self.constants.custom_model:
             return True
         if self.constants.host_is_hackintosh is True:

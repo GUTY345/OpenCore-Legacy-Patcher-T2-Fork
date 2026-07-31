@@ -175,8 +175,8 @@ class BuildSecurity:
         return self.model in _T2_NO_IGPU_MODELS
 
     def _t2_uses_amfipass(self) -> bool:
-        """T2 builds enable AMFIPass in misc._t2_handling (runs after security)."""
-        return self._is_t2_mac()
+        """Return True when the supported T2 path loads AMFIPass.kext."""
+        return False
 
     def _apply_t2_amfi_boot_args(self, apple_nvram_uuid: str) -> None:
         """Apply AMFI-related boot-args based on user path validation."""
@@ -206,6 +206,9 @@ class BuildSecurity:
     def _get_graphics_device_properties_path(self):
         """Return the probed PCI path for the integrated graphics device."""
         if self.constants.custom_model:
+            if self.model == "MacBookPro15,1":
+                logging.info(f"- {self.model}: Using known iGPU PCI path for custom model build")
+                return "PciRoot(0x0)/Pci(0x2,0x0)"
             logging.info("- Skipping T2 Intel graphics injection for custom model (no probed iGPU path)")
             return None
 
@@ -249,9 +252,9 @@ class BuildSecurity:
     #   laptop whose internal panel runs through the iGPU path, so it is left with
     #   no usable framebuffer => gray screen, no GUI shell.
     #
-    #   MacBookPro15,1 is a genuine Mac and should use its NATIVE Apple framebuffer
-    #   (no injection). Skip the injection for it. REVERT (remove from the set) if
-    #   hardware testing shows the installer GUI still does not appear.
+    #   B5 baseline: MacBookPro15,1 uses 0x3E9B0009 (mobile eDP) instead of
+    #   0x3E9B0006 (headless) to drive the internal display. dGPU is disabled
+    #   via DeviceProperties (disable-gpu). WhateverGreen is not used.
     _SKIP_IGPU_INJECTION_MODELS = set()
 
     def _apply_t2_graphics_injection(self) -> None:
@@ -360,6 +363,10 @@ class BuildSecurity:
         if self.constants.detected_os >= os_data.os_data.tahoe:
             self.is_tahoe_target = True
             self._apply_cryptex_patches(apple_nvram_uuid)
+        elif self.model == "MacBookPro15,1":
+            logging.info("  > MacBookPro15,1 fork target: assuming macOS 26 Tahoe for deterministic CLI builds.")
+            self.is_tahoe_target = True
+            self._apply_cryptex_patches(apple_nvram_uuid)
         elif self.is_tahoe_target is False and self.constants.detected_os >= os_data.os_data.catalina and self.constants.detected_os < os_data.os_data.tahoe:
             logging.info("Popping up a popup to ask if the OS target is Tahoe or not since we couldn't identify...")
             self._unknown_target(apple_nvram_uuid)
@@ -460,11 +467,13 @@ class BuildSecurity:
             self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-disable_sidecar_mac -disable_media_analysis")
 
             # Restore WEG boot-args for iGPU stability.
-            # igfxonln=1: force iGPU online (needed during installer init)
-            # igfxfw=2: load Intel GPU firmware (Coffee Lake GT2)
-            # forceRenderStandby=0: prevent render standby during installer
-            # agdpmod=vit9696: bypass AGDP board-id check (WEG feature)
-            if self._requires_t2_graphics_injection():
+            # 2026-07-27: MacBookPro15,1 SKIPS all WhateverGreen boot-args —
+            # WhateverGreen.kext is not loaded for MBP15,1 because its probe()
+            # fails on Tahoe and its load-time framebuffer hooks cause gray
+            # screen.  igfxonln/igfxfw/agdpmod are WEG-specific and meaningless
+            # without the kext loaded.  -wegnoegpu is also WEG-specific; dGPU
+            # disable is handled via DeviceProperties (disable-gpu) instead.
+            if self._requires_t2_graphics_injection() and self.model != "MacBookPro15,1":
                 self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args",
                     "igfxonln=1 igfxfw=2 forceRenderStandby=0 agdpmod=vit9696")
 
@@ -473,12 +482,13 @@ class BuildSecurity:
             #     iGPU). See _DISABLE_UNSUPPORTED_DGPU_MODELS for the full evidence.
             if self.model in _DISABLE_UNSUPPORTED_DGPU_MODELS:
                 logging.info(f"- {self.model}: Disabling unsupported discrete GPU (driver removed in Tahoe) — running iGPU-only (Exp B2)")
-                # -wegnoegpu is a WhateverGreen boot-arg that adds disable-gpu to GFX0.
-                self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-wegnoegpu")
-                # backup: inject disable-gpu directly on dGPU DeviceProperties
-                # because WhateverGreen probe fails on Tahoe → start() never called →
-                # -wegnoegpu boot-arg is never processed.  DeviceProperties injection
-                # happens via OpenCore before kext load, so it works without WG.
+                # 2026-07-27: -wegnoegpu boot-arg is SKIPPED for MBP15,1 because
+                # WhateverGreen.kext is not loaded (probe fails on Tahoe, causes
+                # gray screen).  The dGPU is disabled via DeviceProperties injection
+                # (disable-gpu) which works via OpenCore before kext load.
+                if self.model != "MacBookPro15,1":
+                    self._update_nvram_string(APPLE_NVRAM_UUID, "boot-args", "-wegnoegpu")
+                # inject disable-gpu directly on dGPU DeviceProperties
                 dgpu_path = "PciRoot(0x0)/Pci(0x1,0x0)/Pci(0x0,0x0)"
                 self._ensure_path("DeviceProperties", "Add", dgpu_path)
                 self.config["DeviceProperties"]["Add"][dgpu_path]["disable-gpu"] = binascii.unhexlify("01000000")
@@ -570,7 +580,7 @@ class BuildSecurity:
 
         if self._is_t2_mac():
             if self.is_tahoe_target or smbios_data.smbios_dictionary[self.model]["Max OS Supported"] < self.constants.detected_os:
-                needs_amfipass = True
+                needs_amfipass = self._t2_uses_amfipass()
         else:
             if smbios_data.smbios_dictionary[self.model]["Max OS Supported"] < os_data.os_data.sonoma:
                 needs_amfipass = True

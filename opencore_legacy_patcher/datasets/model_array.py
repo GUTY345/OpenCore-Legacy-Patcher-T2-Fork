@@ -390,3 +390,10 @@ T2Macs = [
     "Macmini8,1",
     "iMacPro1,1",
 ]
+
+# This fork only ships verified T2 boot policy for MacBookPro15,1.
+SupportedT2Macs = [
+    "MacBookPro15,1",
+]
+
+UnsupportedT2Macs = [model for model in T2Macs if model not in SupportedT2Macs]

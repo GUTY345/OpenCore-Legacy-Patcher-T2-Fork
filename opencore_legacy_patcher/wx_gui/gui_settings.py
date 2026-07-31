@@ -823,6 +823,7 @@ class SettingsFrame(wx.Frame):
                         "you vulnerable to newly discovered vulnerabilities that",
                         "have been already patched."
                     ],
+                    "warning": "Disabling automatic updates means you will NOT receive critical security patches.\n\nAttackers can exploit known vulnerabilities in older versions to install malware or launch attacks.\n\nAre you absolutely certain you want to disable automatic updates?",
                     "override_function": self._update_global_settings,
                 },
                 "wrap_around 1": {

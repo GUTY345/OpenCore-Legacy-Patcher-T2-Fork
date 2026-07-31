@@ -184,6 +184,9 @@ class arguments:
 
         if self.args.model:
             if self.args.model:
+                if self.args.model in model_array.UnsupportedT2Macs:
+                    logging.info(f"- {self.args.model} is a T2 Mac that this fork does not support. Only MacBookPro15,1 has verified T2 OpenCore patches.")
+                    sys.exit(1)
                 logging.info(f"- Using custom model: {self.args.model}")
                 self.constants.custom_model = self.args.model
                 defaults.GenerateDefaults(self.constants.custom_model, False, self.constants)
@@ -270,5 +273,9 @@ If you plan to create the USB for another machine, please select the "Change Mod
             logging.info("- Building for natively supported model")
             self.constants.allow_oc_everywhere = True
             self.constants.serial_settings = "None"
+
+        if not self.constants.custom_model and self.constants.computer.real_model in model_array.UnsupportedT2Macs:
+            logging.info(f"- {self.constants.computer.real_model} is a T2 Mac that this fork does not support. Only MacBookPro15,1 has verified T2 OpenCore patches.")
+            sys.exit(1)
 
         build.BuildOpenCore(self.constants.custom_model or self.constants.computer.real_model, self.constants)

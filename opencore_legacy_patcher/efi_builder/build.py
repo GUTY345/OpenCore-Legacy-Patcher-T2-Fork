@@ -241,7 +241,7 @@ class BuildOpenCore:
 
             raw_args = self.config["NVRAM"]["Add"][apple_nvram_uuid].get("boot-args", "")
             scrubbed_args = " ".join(arg for arg in raw_args.split() if not arg.startswith("-lilu"))
-            t2_args = "-ibtcompatbeta -amfipassbeta"
+            t2_args = "-ibtcompatbeta"
             self.config["NVRAM"]["Add"][apple_nvram_uuid]["boot-args"] = f"{scrubbed_args} {t2_args}".strip()
 
             self.config["NVRAM"]["WriteFlash"] = True

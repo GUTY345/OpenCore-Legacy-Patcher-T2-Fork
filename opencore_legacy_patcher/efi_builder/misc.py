@@ -277,6 +277,16 @@ class BuildMiscellaneous:
                 builder.enable_kext("AppleUSBTrackpad.kext", self.constants.apple_trackpad, self.constants.apple_trackpad_path)
                 builder.enable_kext("LegacyKeyboardInjector.kext", self.constants.legacy_keyboard, self.constants.legacy_keyboard_path)
 
+            if self._is_t2_mac():
+                builder = support.BuildSupport(self.model, self.constants, self.config)
+                builder.enable_kext("AppleUSBTopCase.kext", self.constants.topcase_version, self.constants.top_case_path)
+                for part in ["AppleUSBTCButtons.kext", "AppleUSBTCKeyboard.kext", "AppleUSBTCKeyEventDriver.kext"]:
+                    obj = builder.get_kext_by_bundle_path(f"AppleUSBTopCase.kext/Contents/PlugIns/{part}")
+                    if obj:
+                        obj["Enabled"] = True
+                builder.enable_kext("AppleUSBMultitouch.kext", self.constants.multitouch_version, self.constants.multitouch_path)
+                logging.info(f"- {self.model}: Enabling USB top case + multitouch trackpad kexts for T2 Mac")
+
     def _thunderbolt_handling(self) -> None:
         """Thunderbolt Handler."""
         if self.constants.disable_tb is True and self.model in ["MacBookPro11,1", "MacBookPro11,2", "MacBookPro11,3", "MacBookPro11,4", "MacBookPro11,5"]:
@@ -521,22 +531,24 @@ class BuildMiscellaneous:
             logging.error("We couldn't verify if injecting optional patcges are enabled or not, but they must be disabled if the variable is not set to True.")
 
         # Prerequisite kext checks
-        for kext, ver, path in [
-            ("WhateverGreen.kext", self.constants.whatevergreen_version, self.constants.whatevergreen_path),
-            ("CryptexFixup.kext", "1.0.5", self.constants.kexts_path),
-            ("AMFIPass.kext", "1.4.1", self.constants.kexts_path)
-        ]:
-            obj = builder.get_kext_by_bundle_path(kext)
-            if not obj or obj.get("Enabled") is not True:
-                logging.info(f"- Enabling {kext}")
-                builder.enable_kext(kext, ver, path)
-
-        # WhateverGreen is KEPT ENABLED for T2 to process igfxonln=1,
-        # igfxfw=2, agdpmod=vit9696, -wegnoegpu boot-args.  Note: WEG probe()
-        # may fail on Tahoe — if so, these args are simply not processed (harmless).
-        # DeviceProperties injection (ig-platform-id, disable-gpu) works without WEG
-        # regardless.  If WEG causes GUI hang during installer, disable it manually
-        # via boot-args by adding -igfxnoigpuoutput or by removing WEG.kext.
+        # 2026-07-27: WhateverGreen, CryptexFixup, AMFIPass are SKIPPED for
+        # MacBookPro15,1 — matching the old working version (Fork 2.0.0-b-1).
+        # WhateverGreen probe() fails on Tahoe BootKC, and even with probe()
+        # failure the kext's load-time framebuf hooks cause gray screen on
+        # MBP15,1's native Apple framebuffer.  DeviceProperties injection
+        # (ig-platform-id, disable-gpu) works without WEG via OpenCore.
+        if self.model == "MacBookPro15,1":
+            logging.info(f"- {self.model}: Skipping AMFIPass, WhateverGreen, CryptexFixup (isolation build)")
+        else:
+            for kext, ver, path in [
+                ("WhateverGreen.kext", self.constants.whatevergreen_version, self.constants.whatevergreen_path),
+                ("CryptexFixup.kext", "1.0.5", self.constants.kexts_path),
+                ("AMFIPass.kext", "1.4.1", self.constants.kexts_path)
+            ]:
+                obj = builder.get_kext_by_bundle_path(kext)
+                if not obj or obj.get("Enabled") is not True:
+                    logging.info(f"- Enabling {kext}")
+                    builder.enable_kext(kext, ver, path)
 
         # Handle explicit performance/timeout panics on specific MacBook lines
         # MinKernel is 24.0.0 (Sequoia's Darwin version) instead of 25.x.x because the installer runs on Darwin 24, even for macOS 26 Tahoe.
@@ -552,23 +564,6 @@ class BuildMiscellaneous:
                 logging.info(f"- {self.model}: Great news! We tried disabling USB-Map.kext and USB-Map-Tahoe.kext but we didn't find them.")
                 logging.info("You don't have to worry about this message.")
         APPLE_NVRAM_UUID = "7C436110-AB2A-4BBB-A880-FE41995C9F82"
-
-        # DISABLED 2026-07-27: Setting prev-lang:kbd / AppleLanguages / AppleLocale
-        # caused the macOS Tahoe installer to show a gray screen with no UI on
-        # MacBookPro15,1 (and possibly other T2 models).  Re-enabling requires
-        # verifying that the installer windows still appear correctly.
-        #
-        # try:
-        #     logging.info("- Skipping Language and Region selection (all T2 models)")
-        #     prev_lang_bytes = b"en-US:0"
-        #     self._set_nvram_value(APPLE_NVRAM_UUID, "prev-lang:kbd", prev_lang_bytes, overwrite=True)
-        #     self._set_nvram_value(APPLE_NVRAM_UUID, "AppleLanguages", ["en-US"], overwrite=True)
-        #     self._set_nvram_value(APPLE_NVRAM_UUID, "AppleLocale", "en_US", overwrite=True)
-        # except Exception as e:
-        #     logging.error("We failed to skip language and region selection. It failed to do so because of the following error:")
-        #     logging.exception("Stack Trace:")
-        #     logging.info("Please try again later.")
-        #     sys.exit(3)
 
         try:
             logging.info("- Adding T2-specific boot arguments for macOS 15/26")
@@ -672,6 +667,32 @@ class BuildMiscellaneous:
                     logging.info("  > Injecting AppleKeyStore Tahoe deadline check bypass")
                     kernel_patches.append(new_patch)
 
+            # 3b. AppleKeyStore SEP retry-limit extension (upstream 4.0.0.16020)
+            #     Extends the SEP retry limit from 20 to 200 instead of NOP-ing
+            #     out the deadline check entirely. This gives the T2 SEP more
+            #     time to respond before timing out, which is safer than
+            #     immediately returning success.
+            if not any(p.get("Comment") == "Patch AppleKeyStore SEP retry limit" for p in kernel_patches):
+                new_patch = {
+                    "Arch": "x86_64",
+                    "Identifier": "com.apple.driver.AppleKeyStore",
+                    "Base": "",
+                    "Comment": "Patch AppleKeyStore SEP retry limit",
+                    "Count": 1,
+                    "Enabled": True,
+                    "MinKernel": "25.0.0",
+                    "MaxKernel": "25.99.99",
+                    "Find": binascii.unhexlify("FF90F00100004183FF140F8D06050000"),
+                    "Replace": binascii.unhexlify("FF90F00100004183FFC80F8D06050000"),
+                    "Mask": b"",
+                    "ReplaceMask": b"",
+                    "Limit": 0,
+                    "Skip": 0
+                }
+                if self._validate_patch(new_patch):
+                    logging.info("  > Injecting AppleKeyStore SEP retry-limit extension (20 → 200)")
+                    kernel_patches.append(new_patch)
+
             # 4. Bypass AppleIntelUSBXHCI T2 handshake (Modernized for Tahoe vtable shifts)
             if not any(p.get("Comment") == "Bypass T2 USB handshake (Tahoe fix)" for p in kernel_patches):
                 new_patch = {
@@ -762,36 +783,39 @@ class BuildMiscellaneous:
             #   apfs_extract_root_hash_and_manifest_x86: populate_value_from_memory_descriptor
             #   for root hash failed: 22
             #   authenticate_efi_forwarded_roothash: failed with error: Invalid argument (22)
-            # This causes the installer to hang during disk enumeration after
-            # the language selection screen.  The normal macOS boot uses
-            # authenticate_root_hash (which works fine), but the USB installer
-            # boot path uses authenticate_efi_forwarded_roothash which fails
-            # because the T2 Secure Enclave can't verify the root hash of an
-            # unsupported USB installer.  We patch BOTH functions to cover
-            # whichever path the installer takes.
-            try:
-                logging.info(f"- {self.model}: Bypassing APFS root hash validation for installer disk enumeration")
-                new_patch = {
-                    "Arch": "x86_64",
-                    "Identifier": "com.apple.filesystems.apfs",
-                    "Base": "_authenticate_efi_forwarded_roothash",
-                    "Comment": "Bypass APFS EFI forwarded root hash validation for T2 installer",
-                    "Count": 1,
-                    "Enabled": True,
-                    "MinKernel": "24.0.0",
-                    "Find": b"",
-                    "Replace": binascii.unhexlify("B800000000C3"),
-                    "Mask": b"",
-                    "ReplaceMask": b"",
-                    "Limit": 0,
-                    "Skip": 0
-                }
-                if self._validate_patch(new_patch):
-                    logging.info("- Injecting APFS EFI forwarded root hash validation bypass patch")
-                    kernel_patches.append(new_patch)
-            except Exception as e:
-                logging.error("Failed to inject APFS root hash validation bypass patch:")
-                logging.exception("Stack Trace:")
+            #
+            # 2026-07-27: _authenticate_efi_forwarded_roothash is DISABLED —
+            # the symbol is stripped from Tahoe's BootKernelExtensions.kc
+            # (OpenCore log shows "Prelinked patcher result 2 - Not Found").
+            # The function still exists in the binary but without an exported
+            # symbol, OpenCore cannot resolve the Base address.  The on-disk
+            # variant (_authenticate_root_hash) IS patched and succeeds.
+            # The installer freeze was previously addressed by prev-lang:kbd bypass.
+            # That bypass has been removed per recommendation.
+            #
+            # try:
+            #     logging.info(f"- {self.model}: Bypassing APFS root hash validation for installer disk enumeration")
+            #     new_patch = {
+            #         "Arch": "x86_64",
+            #         "Identifier": "com.apple.filesystems.apfs",
+            #         "Base": "_authenticate_efi_forwarded_roothash",
+            #         "Comment": "Bypass APFS EFI forwarded root hash validation for T2 installer",
+            #         "Count": 1,
+            #         "Enabled": False,
+            #         "MinKernel": "24.0.0",
+            #         "Find": b"",
+            #         "Replace": binascii.unhexlify("B800000000C3"),
+            #         "Mask": b"",
+            #         "ReplaceMask": b"",
+            #         "Limit": 0,
+            #         "Skip": 0
+            #     }
+            #     if self._validate_patch(new_patch):
+            #         logging.info("- Injecting APFS EFI forwarded root hash validation bypass patch")
+            #         kernel_patches.append(new_patch)
+            # except Exception as e:
+            #     logging.error("Failed to inject APFS root hash validation bypass patch:")
+            #     logging.exception("Stack Trace:")
 
             try:
                 new_patch = {
@@ -904,30 +928,33 @@ class BuildMiscellaneous:
             # Phase 4: Broader T2 bypass patches
             # ----------------------------------------------------------------
 
-            # Phase 4.1: SEPManager panic → unconditional jump past panic
-            # From issue #39 community fix (Mac mini 2018 verified).
-            # The conditional jump (jne +0x4F) is changed to unconditional
-            # (jmp +0x4F) so the panic path is never taken.  This prevents
-            # SEPManager from panicking when it can't reach the T2 bridge
-            # during installer disk enumeration.
-            if not any(p.get("Comment") == "Bypass SEPManager panic on SEP timeout (Phase 4)" for p in kernel_patches):
+            # Phase 4.1: SEPManager signalTimeout → return 0 (bypass timeout panic)
+            # 2026-07-27: The raw byte pattern 4883BFB003000000754F does NOT exist
+            # in Tahoe's BootKernelExtensions.kc (OpenCore log: result 7 - Not Found).
+            # The cmp [rdi+0x3B0],0 / jne instruction was restructured in Tahoe.
+            # Instead, use the mangled symbol __ZN15AppleSEPManager13signalTimeoutEj
+            # which IS exported in Tahoe BootKC.  Patching signalTimeout to return 0
+            # immediately prevents the timeout from being signaled, which prevents
+            # the panic that would otherwise occur when SEPManager can't reach the
+            # T2 bridge during installer disk enumeration.
+            if not any(p.get("Comment") == "Bypass SEPManager signalTimeout (Phase 4)" for p in kernel_patches):
                 new_patch = {
                     "Arch": "x86_64",
                     "Identifier": "com.apple.driver.AppleSEPManager",
-                    "Base": "",
-                    "Comment": "Bypass SEPManager panic on SEP timeout (Phase 4)",
+                    "Base": "__ZN15AppleSEPManager13signalTimeoutEj",
+                    "Comment": "Bypass SEPManager signalTimeout (Phase 4)",
                     "Count": 1,
                     "Enabled": True,
                     "MinKernel": "24.0.0",
-                    "Find": binascii.unhexlify("4883BFB003000000754F"),
-                    "Replace": binascii.unhexlify("4883BFB003000000EB4F"),
+                    "Find": b"",
+                    "Replace": binascii.unhexlify("31C0C3"),
                     "Mask": b"",
                     "ReplaceMask": b"",
                     "Limit": 0,
                     "Skip": 0
                 }
                 if self._validate_patch(new_patch):
-                    logging.info("- Phase 4: Injecting SEPManager panic→return patch")
+                    logging.info("- Phase 4: Injecting SEPManager signalTimeout→return 0 patch")
                     kernel_patches.append(new_patch)
 
             # Phase 4.2: XHCI event timeout increase (10 → 255)
@@ -962,15 +989,15 @@ class BuildMiscellaneous:
             logging.info("Please try again later.")
             sys.exit(3)
 
-        # Phase 4.3: Block AppleT2SMC and IOBufferCopyController kexts
-        # From issue #39 community fix.  AppleT2SMC causes 800MHz CPU
-        # throttling on unsupported T2 Macs, and IOBufferCopyController
-        # triggers bridge DMA timeouts.  Blocking both prevents panics
-        # during installer initialization.
+        # Phase 4.3: Block IOBufferCopyController kext
+        # From issue #39 community fix.  IOBufferCopyController triggers bridge
+        # DMA timeouts on T2 Macs during installer initialization.
+        # 2026-07-27: AppleT2SMC is REMOVED — the kext does NOT exist in
+        # Tahoe BootKernelExtensions.kc (OpenCore log: blocker result 0 - Not Found).
+        # Only IOBufferCopyController remains as it IS present in the KC.
         try:
-            logging.info("- Phase 4: Blocking problematic T2 kexts (AppleT2SMC, IOBufferCopyController)")
+            logging.info("- Phase 4: Blocking IOBufferCopyController kext")
             block_idents = [
-                ("com.apple.driver.AppleT2SMC", "Prevent T2 SMC throttling panic (Phase 4)"),
                 ("com.apple.iokit.IOBufferCopyController", "Prevent bridge DMA timeout panic (Phase 4)"),
             ]
             self.config.setdefault("Kernel", {}).setdefault("Block", [])

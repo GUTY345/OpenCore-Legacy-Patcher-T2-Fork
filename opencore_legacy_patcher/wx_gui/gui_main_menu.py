@@ -25,7 +25,8 @@ from ..support import (
 )
 from ..datasets import (
     os_data,
-    css_data
+    css_data,
+    model_array
 )
 from ..wx_gui import (
     gui_build,
@@ -128,7 +129,10 @@ class MainFrame(wx.Frame):
 
             if button_name == "Build and Install OpenCore" and not gui_support.CheckProperties(self.constants).host_can_build():
                 button.Disable()
-                button.SetToolTip("Building OpenCore is not supported on Hackintoshes or virtual machines. For installing OpenCore on Hackintoshes, follow Dortania's guide here: https://dortania.github.io/OpenCore-Install-Guide/")
+                if (self.constants.custom_model or self.constants.computer.real_model) in model_array.UnsupportedT2Macs:
+                    button.SetToolTip("This T2 Mac is not supported by this fork. Only MacBookPro15,1 has verified T2 OpenCore patches.")
+                else:
+                    button.SetToolTip("Building OpenCore is not supported on Hackintoshes or virtual machines. For installing OpenCore on Hackintoshes, follow Dortania's guide here: https://dortania.github.io/OpenCore-Install-Guide/")
 
             description_label = wx.StaticText(self, label='\n'.join(button_function["description"]), pos=(button_x + 75, button.GetPosition()[1] + 33))
             description_label.SetFont(gui_support.font_factory(10, wx.FONTWEIGHT_NORMAL))
