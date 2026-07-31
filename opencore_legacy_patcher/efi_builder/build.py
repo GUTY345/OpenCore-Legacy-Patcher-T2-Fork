@@ -33,6 +33,7 @@ security,
 misc
 )
 from ..datasets import (
+    model_array,
     os_data
 )
 
@@ -100,7 +101,11 @@ class BuildOpenCore:
             logging.error("We couldn't make sure if you are targeting macOS 27 Golden Gate or newer. Skip checking...")
             logging.exception("Stack Trace:")
             pass
-                
+
+        if self.model in model_array.UnsupportedT2Macs:
+            logging.error(f"Build blocked: {self.model} is a T2 Mac not supported by this fork. Only MacBookPro15,1 has verified T2 OpenCore patches.")
+            sys.exit(1)
+
         utilities.cls()
         logging.info(f"Building Configuration {'for external' if self.constants.custom_model else 'on model'}: {self.model}")
 
